@@ -24,19 +24,38 @@ unit iaRTL.Process.Executor.Windows;
 
 interface
 uses
+  WinAPI.Windows,
   iaRTL.Process.Executor.API;
 
 type
 
+  TiaWindowsLaunchContext = record
+    CommandLine:String;
+    ProcessInfo:TProcessInformation;
+    StartupInfo:TStartupInfo;
+    ExitCode:DWord;
+    ErrorCode:DWord;
+    ErrorMessage:String;
+  end;
+
   TiaWindowsProcessExecutor = class(TInterfacedObject, IAProcessExecutor)
+  protected
+    fLaunchContext:TiaWindowsLaunchContext;
+    function StartProcess:Boolean;
+    function WaitForProcess:Boolean;
+    function GetExitCode:Boolean;
+    procedure CleanUpProcess;
+    procedure CaptureSystemError;
   public
-    {IAProcessExecutor}
     /// <summary>
     /// Executes the given command line and waits for the program started by the
     /// command line to exit. Returns true if the program returns a zero exit code and
     /// false if the program doesn't start or returns a non-zero error code.
     /// </summary>
+    /// <remarks>IAProcessExecutor</remarks>
     function LaunchProcess(const pCommandLine:string):Boolean;
+
+    property LaunchContext:TiaWindowsLaunchContext read fLaunchContext;
   end;
 
   /// <summary>
@@ -46,46 +65,104 @@ type
   /// </summary>
   function ExecAndWait(const pCommandLine:string):Boolean;
 
+
 implementation
 uses
-  WinAPI.Windows;
+  System.SysUtils;
 
 
 function TiaWindowsProcessExecutor.LaunchProcess(const pCommandLine:string):Boolean;
-var
-  vStartupInfo:TStartupInfo;
-  vProcessInfo:TProcessInformation;
-  vProcessExitCode:DWord;
-  vSafeCommandLine:string;
 begin
   Result := False;
 
-  // Modification to work round "feature" in CreateProcessW API function used by Unicode Delphis.
-  vSafeCommandLine := pCommandLine;
-  UniqueString(vSafeCommandLine);
+  fLaunchContext := Default(TiaWindowsLaunchContext);
+  fLaunchContext.StartupInfo.cb := SizeOf(fLaunchContext.StartupInfo);
 
-  FillChar(vStartupInfo, SizeOf(vStartupInfo), 0);
-  vStartupInfo.cb := SizeOf(vStartupInfo);
+  // see: http://edn.embarcadero.com/article/38693
+  // The Unicode version of this function, CreateProcessW, can modify the contents of this string.
+  // Therefore, this parameter cannot be a pointer to read-only memory (such as a const variable or a literal string).
+  // If this parameter is a constant string, the function may cause an access violation
+  // also: https://stackoverflow.com/questions/6705532/access-violation-in-function-createprocess-in-delphi-2009
+  fLaunchContext.CommandLine := pCommandLine;
+  UniqueString(fLaunchContext.CommandLine);
 
-  //https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-  if CreateProcess(nil, PChar(vSafeCommandLine), nil, nil, False, 0, nil, nil, vStartupInfo, vProcessInfo) then
+  //todo: Event for customizing StartupInfo
+  if StartProcess then
   begin
     try
-      // Now wait for application to complete
-      if WaitForSingleObject(vProcessInfo.hProcess, INFINITE) = WAIT_OBJECT_0 then
+      if WaitForProcess and GetExitCode then
       begin
-        if GetExitCodeProcess(vProcessInfo.hProcess, vProcessExitCode) then
-        begin
-          Result := (vProcessExitCode = 0);
-        end;
+        Result := (fLaunchContext.ExitCode = 0);
       end;
     finally
-      CloseHandle(vProcessInfo.hProcess);
-      CloseHandle(vProcessInfo.hThread);
+      CleanUpProcess;
     end;
   end;
-  //todo: GetLastError
+
 end;
+
+function TiaWindowsProcessExecutor.StartProcess:Boolean;
+begin
+  //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
+  Result := CreateProcess(nil, PChar(fLaunchContext.CommandLine), nil, nil, False, 0, nil, nil, fLaunchContext.StartupInfo, fLaunchContext.ProcessInfo);
+
+  if not Result then
+  begin
+    CaptureSystemError;
+  end;
+end;
+
+
+function TiaWindowsProcessExecutor.WaitForProcess:Boolean;
+var
+  vRetVal:DWORD;
+begin
+  //API: https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
+  vRetVal := WaitForSingleObject(fLaunchContext.ProcessInfo.hProcess, INFINITE);
+
+  case vRetVal of
+    WAIT_OBJECT_0:
+      begin
+        Result := True;
+      end;
+    WAIT_FAILED:
+      begin
+        Result := False;
+        CaptureSystemError;
+      end;
+    else
+      begin
+        raise Exception.Create('WaitForSingleObject unknown failure #' + IntToStr(vRetVal));
+      end;
+  end;
+end;
+
+
+function TiaWindowsProcessExecutor.GetExitCode:Boolean;
+begin
+  //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
+  Result := GetExitCodeProcess(fLaunchContext.ProcessInfo.hProcess, fLaunchContext.ExitCode);
+
+  if not Result then
+  begin
+    CaptureSystemError;
+  end;
+end;
+
+
+procedure TiaWindowsProcessExecutor.CleanUpProcess;
+begin
+  CloseHandle(fLaunchContext.ProcessInfo.hProcess);
+  CloseHandle(fLaunchContext.ProcessInfo.hThread);
+end;
+
+
+procedure TiaWindowsProcessExecutor.CaptureSystemError;
+begin
+  fLaunchContext.ErrorCode := GetLastError;
+  fLaunchContext.ErrorMessage := SysErrorMessage(fLaunchContext.ErrorCode);
+end;
+
 
 function ExecAndWait(const pCommandLine:string):Boolean;
 var
@@ -98,5 +175,6 @@ begin
     vProcessLauncher.Free;
   end;
 end;
+
 
 end.
