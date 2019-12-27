@@ -38,9 +38,10 @@ type
     ErrorMessage:String;
   end;
 
+
   TiaWindowsProcessExecutor = class(TInterfacedObject, IAProcessExecutor)
   private const
-    defWaitForInputIdleMaxMS = 1000;
+    defWaitForInputIdleMaxMS = 750;
   private
     fContext:TiaWindowsLaunchContext;
     fWaitForInputIdleMaxMS:Integer;
@@ -53,6 +54,7 @@ type
     procedure CaptureSystemError;
   public
     constructor Create;
+
     /// <summary>
     /// Executes the given command line and waits for the program started by the
     /// command line to exit. Returns true if the programf returns a zero exit code and
@@ -72,6 +74,14 @@ type
     /// Context of the child application process for inspection/logging purposes
     /// </summary>
     property Context:TiaWindowsLaunchContext read fContext;
+
+    /// <summary>
+    /// Delay passed to WaitForInputIdle after launching a new process, granting the process time to startup and become idle
+    /// </summary>
+    /// <remarks>(Current default is 750ms)
+    /// A minor optimization is to set this to 0 if not waiting for the process to complete and not interested in
+    /// immediately interacting with the child process.
+    /// </remarks>
     property WaitForInputIdleMaxMS:Integer read fWaitForInputIdleMaxMS write fWaitForInputIdleMaxMS;
   end;
 
@@ -122,6 +132,7 @@ begin
   // Therefore, this parameter cannot be a pointer to read-only memory (such as a const variable or a literal string).
   // If this parameter is a constant string, the function may cause an access violation
   // also: https://stackoverflow.com/questions/6705532/access-violation-in-function-createprocess-in-delphi-2009
+  // which references using UniqueString
   fContext.CommandLine := pCommandLine;
   UniqueString(fContext.CommandLine);
 
@@ -129,10 +140,10 @@ begin
   if StartProcess then
   begin
     try
+      WaitForProcessStabilization;
+
       if pWaitForCompletion then
       begin
-        WaitForProcessStabilization;
-
         if WaitForProcessCompletion and GetExitCode then
         begin
           Result := (fContext.ExitCode = 0);
@@ -146,8 +157,8 @@ begin
       CleanUpProcess;
     end;
   end;
-
 end;
+
 
 function TiaWindowsProcessExecutor.StartProcess:Boolean;
 begin
@@ -159,6 +170,7 @@ begin
     CaptureSystemError;
   end;
 end;
+
 
 procedure TiaWindowsProcessExecutor.WaitForProcessStabilization;
 begin
@@ -232,8 +244,10 @@ begin
   CloseHandle(fContext.ProcessInfo.hThread);
 end;
 
+
 procedure TiaWindowsProcessExecutor.CaptureSystemError;
 begin
+  //API: https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
   fContext.ErrorCode := GetLastError;
   fContext.ErrorMessage := SysErrorMessage(fContext.ErrorCode);
 end;
