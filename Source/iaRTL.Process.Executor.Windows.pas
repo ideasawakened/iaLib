@@ -31,32 +31,50 @@ type
 
   TiaWindowsLaunchContext = record
     CommandLine:String;
-    ProcessInfo:TProcessInformation;
     StartupInfo:TStartupInfo;
+    ProcessInfo:TProcessInformation;
     ExitCode:DWord;
     ErrorCode:DWord;
     ErrorMessage:String;
   end;
 
   TiaWindowsProcessExecutor = class(TInterfacedObject, IAProcessExecutor)
+  private const
+    defWaitForInputIdleMaxMS = 1000;
+  private
+    fContext:TiaWindowsLaunchContext;
+    fWaitForInputIdleMaxMS:Integer;
   protected
-    fLaunchContext:TiaWindowsLaunchContext;
     function StartProcess:Boolean;
-    function WaitForProcess:Boolean;
+    procedure WaitForProcessStabilization;
+    function WaitForProcessCompletion:Boolean;
     function GetExitCode:Boolean;
     procedure CleanUpProcess;
     procedure CaptureSystemError;
   public
+    constructor Create;
     /// <summary>
     /// Executes the given command line and waits for the program started by the
-    /// command line to exit. Returns true if the program returns a zero exit code and
+    /// command line to exit. Returns true if the programf returns a zero exit code and
     /// false if the program doesn't start or returns a non-zero error code.
     /// </summary>
-    /// <remarks>IAProcessExecutor</remarks>
-    function LaunchProcess(const pCommandLine:string):Boolean;
+    /// <remarks>Implements IAProcessExecutor</remarks>
+    function LaunchProcess(const pCommandLine:string):Boolean; overload;
 
-    property LaunchContext:TiaWindowsLaunchContext read fLaunchContext;
+    /// <summary>
+    /// Executes the given command line and optionally waits for the program started by the
+    /// command line to exit. If not waiting for the process to complete this returns True if
+    /// the process was started, false otherwise.
+    /// </summary>
+    function LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean):Boolean; overload;
+
+    /// <summary>
+    /// Context of the child application process for inspection/logging purposes
+    /// </summary>
+    property Context:TiaWindowsLaunchContext read fContext;
+    property WaitForInputIdleMaxMS:Integer read fWaitForInputIdleMaxMS write fWaitForInputIdleMaxMS;
   end;
+
 
   /// <summary>
   /// Executes the given command line and waits for the program started by the
@@ -66,33 +84,63 @@ type
   function ExecAndWait(const pCommandLine:string):Boolean;
 
 
+  /// <summary>
+  /// Executes the given command line and does not wait for it to finish runing before returning
+  /// </summary>
+  function StartProcess(const pCommandLine:string):Boolean;
+
+
 implementation
 uses
   System.SysUtils;
 
 
+constructor TiaWindowsProcessExecutor.Create;
+begin
+  inherited;
+  fWaitForInputIdleMaxMS := defWaitForInputIdleMaxMS;
+end;
+
+
 function TiaWindowsProcessExecutor.LaunchProcess(const pCommandLine:string):Boolean;
+const
+  WaitForCompletion = True;
+begin
+  Result := LaunchProcess(pCommandLine, WaitForCompletion);
+end;
+
+
+function TiaWindowsProcessExecutor.LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean):Boolean;
 begin
   Result := False;
 
-  fLaunchContext := Default(TiaWindowsLaunchContext);
-  fLaunchContext.StartupInfo.cb := SizeOf(fLaunchContext.StartupInfo);
+  fContext := Default(TiaWindowsLaunchContext);
+  fContext.StartupInfo.cb := SizeOf(fContext.StartupInfo);
 
   // see: http://edn.embarcadero.com/article/38693
   // The Unicode version of this function, CreateProcessW, can modify the contents of this string.
   // Therefore, this parameter cannot be a pointer to read-only memory (such as a const variable or a literal string).
   // If this parameter is a constant string, the function may cause an access violation
   // also: https://stackoverflow.com/questions/6705532/access-violation-in-function-createprocess-in-delphi-2009
-  fLaunchContext.CommandLine := pCommandLine;
-  UniqueString(fLaunchContext.CommandLine);
+  fContext.CommandLine := pCommandLine;
+  UniqueString(fContext.CommandLine);
 
   //todo: Event for customizing StartupInfo
   if StartProcess then
   begin
     try
-      if WaitForProcess and GetExitCode then
+      if pWaitForCompletion then
       begin
-        Result := (fLaunchContext.ExitCode = 0);
+        WaitForProcessStabilization;
+
+        if WaitForProcessCompletion and GetExitCode then
+        begin
+          Result := (fContext.ExitCode = 0);
+        end;
+      end
+      else
+      begin
+        Result := True;
       end;
     finally
       CleanUpProcess;
@@ -104,7 +152,7 @@ end;
 function TiaWindowsProcessExecutor.StartProcess:Boolean;
 begin
   //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-  Result := CreateProcess(nil, PChar(fLaunchContext.CommandLine), nil, nil, False, 0, nil, nil, fLaunchContext.StartupInfo, fLaunchContext.ProcessInfo);
+  Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, nil, fContext.StartupInfo, fContext.ProcessInfo);
 
   if not Result then
   begin
@@ -112,13 +160,38 @@ begin
   end;
 end;
 
+procedure TiaWindowsProcessExecutor.WaitForProcessStabilization;
+begin
+  //If immediately inspecting a newly launched child process, should give it time to stabilize
+  //ex: https://www.tek-tips.com/viewthread.cfm?qid=1443661
+  if WaitForInputIdleMaxMS > 0 then
+  begin
 
-function TiaWindowsProcessExecutor.WaitForProcess:Boolean;
+    {MS: WaitForInputIdle can be useful for synchronizing a parent process and a newly created child process.
+    When a parent process creates a child process, the CreateProcess function returns without waiting
+    for the child process to finish its initialization. Before trying to communicate with the child
+    process, the parent process can use the WaitForInputIdle function to determine when the child's
+    initialization has been completed. For example, the parent process should use the WaitForInputIdle
+    function before trying to find a window associated with the child process.
+
+    Note: can be used at any time, not just during application startup. However, WaitForInputIdle waits
+    only once for a process to become idle; subsequent calls return immediately, whether the process is idle or busy.
+
+    Note: If this process is a console application or does not have a message queue, WaitForInputIdle returns immediately.
+    }
+    //API: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-waitforinputidle?redirectedfrom=MSDN
+    WaitForInputIdle(fContext.ProcessInfo.hProcess, WaitForInputIdleMaxMS);
+  end;
+end;
+
+
+function TiaWindowsProcessExecutor.WaitForProcessCompletion:Boolean;
 var
   vRetVal:DWORD;
+  vError:String;
 begin
   //API: https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
-  vRetVal := WaitForSingleObject(fLaunchContext.ProcessInfo.hProcess, INFINITE);
+  vRetVal := WaitForSingleObject(fContext.ProcessInfo.hProcess, INFINITE);
 
   case vRetVal of
     WAIT_OBJECT_0:
@@ -132,7 +205,10 @@ begin
       end;
     else
       begin
-        raise Exception.Create('WaitForSingleObject unknown failure #' + IntToStr(vRetVal));
+        //shouldn't get here
+        vError := Format('Unhandled return from WaitForSingleObject %d', [vRetVal]);
+        Assert(false, vError);
+        raise Exception.Create(vError);
       end;
   end;
 end;
@@ -141,7 +217,7 @@ end;
 function TiaWindowsProcessExecutor.GetExitCode:Boolean;
 begin
   //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
-  Result := GetExitCodeProcess(fLaunchContext.ProcessInfo.hProcess, fLaunchContext.ExitCode);
+  Result := GetExitCodeProcess(fContext.ProcessInfo.hProcess, fContext.ExitCode);
 
   if not Result then
   begin
@@ -152,29 +228,51 @@ end;
 
 procedure TiaWindowsProcessExecutor.CleanUpProcess;
 begin
-  CloseHandle(fLaunchContext.ProcessInfo.hProcess);
-  CloseHandle(fLaunchContext.ProcessInfo.hThread);
+  CloseHandle(fContext.ProcessInfo.hProcess);
+  CloseHandle(fContext.ProcessInfo.hThread);
 end;
-
 
 procedure TiaWindowsProcessExecutor.CaptureSystemError;
 begin
-  fLaunchContext.ErrorCode := GetLastError;
-  fLaunchContext.ErrorMessage := SysErrorMessage(fLaunchContext.ErrorCode);
+  fContext.ErrorCode := GetLastError;
+  fContext.ErrorMessage := SysErrorMessage(fContext.ErrorCode);
 end;
 
 
 function ExecAndWait(const pCommandLine:string):Boolean;
+const
+  WaitForCompletion = True;
 var
   vProcessLauncher:TiaWindowsProcessExecutor;
 begin
   vProcessLauncher := TiaWindowsProcessExecutor.Create;
   try
-    Result := vProcessLauncher.LaunchProcess(pCommandLine);
+    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion);
   finally
     vProcessLauncher.Free;
   end;
 end;
 
+
+function StartProcess(const pCommandLine:string):Boolean;
+const
+  WaitForCompletion = False;
+var
+  vProcessLauncher:TiaWindowsProcessExecutor;
+begin
+  vProcessLauncher := TiaWindowsProcessExecutor.Create;
+  try
+    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion);
+  finally
+    vProcessLauncher.Free;
+  end;
+end;
+
+
+//reminder
+//WaitForInputIdle shouldn't use INFINITE
+//https://stackoverflow.com/questions/46221282/c-builder-10-2-thread-blocks-waitforinputidle
+//may block for 25 days :)
+//https://stackoverflow.com/questions/10711070/can-process-waitforinputidle-return-false
 
 end.
