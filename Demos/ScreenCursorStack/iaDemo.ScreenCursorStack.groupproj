@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{5417E742-D95B-48A8-B289-E6D20AF3CF53}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="FMX\iaFMXDemo.ScreenCursorStack.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="VCL\iaVCLDemo.ScreenCursorStack.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="iaFMXDemo_ScreenCursorStack">
+        <MSBuild Projects="FMX\iaFMXDemo.ScreenCursorStack.dproj"/>
+    </Target>
+    <Target Name="iaFMXDemo_ScreenCursorStack:Clean">
+        <MSBuild Projects="FMX\iaFMXDemo.ScreenCursorStack.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="iaFMXDemo_ScreenCursorStack:Make">
+        <MSBuild Projects="FMX\iaFMXDemo.ScreenCursorStack.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="iaVCLDemo_ScreenCursorStack">
+        <MSBuild Projects="VCL\iaVCLDemo.ScreenCursorStack.dproj"/>
+    </Target>
+    <Target Name="iaVCLDemo_ScreenCursorStack:Clean">
+        <MSBuild Projects="VCL\iaVCLDemo.ScreenCursorStack.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="iaVCLDemo_ScreenCursorStack:Make">
+        <MSBuild Projects="VCL\iaVCLDemo.ScreenCursorStack.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="iaFMXDemo_ScreenCursorStack;iaVCLDemo_ScreenCursorStack"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="iaFMXDemo_ScreenCursorStack:Clean;iaVCLDemo_ScreenCursorStack:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="iaFMXDemo_ScreenCursorStack:Make;iaVCLDemo_ScreenCursorStack:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
