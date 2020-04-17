@@ -46,7 +46,7 @@ type
     fContext:TiaWindowsLaunchContext;
     fWaitForInputIdleMaxMS:Integer;
   protected
-    function StartProcess:Boolean;
+    function StartProcess(const pWorkingFolder:string):Boolean;
     procedure WaitForProcessStabilization;
     function WaitForProcessCompletion:Boolean;
     function GetExitCode:Boolean;
@@ -68,7 +68,7 @@ type
     /// command line to exit. If not waiting for the process to complete this returns True if
     /// the process was started, false otherwise.
     /// </summary>
-    function LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean):Boolean; overload;
+    function LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean; const pWorkingFolder:string=''):Boolean; overload;
 
     /// <summary>
     /// Context of the child application process for inspection/logging purposes
@@ -91,13 +91,13 @@ type
   /// command line to exit. Returns true if the program returns a zero exit code and
   /// false if the program doesn't start or returns a non-zero error code.
   /// </summary>
-  function ExecAndWait(const pCommandLine:string):Boolean;
+  function ExecAndWait(const pCommandLine:string; const pWorkingFolder:string=''):Boolean;
 
 
   /// <summary>
   /// Executes the given command line and does not wait for it to finish runing before returning
   /// </summary>
-  function StartProcess(const pCommandLine:string):Boolean;
+  function StartProcess(const pCommandLine:string; const pWorkingFolder:string=''):Boolean;
 
 
 implementation
@@ -120,7 +120,7 @@ begin
 end;
 
 
-function TiaWindowsProcessExecutor.LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean):Boolean;
+function TiaWindowsProcessExecutor.LaunchProcess(const pCommandLine:string; const pWaitForCompletion:Boolean; const pWorkingFolder:string=''):Boolean;
 begin
   Result := False;
 
@@ -137,7 +137,7 @@ begin
   UniqueString(fContext.CommandLine);
 
   //todo: Event for customizing StartupInfo
-  if StartProcess then
+  if StartProcess(pWorkingFolder) then
   begin
     try
       WaitForProcessStabilization;
@@ -160,10 +160,17 @@ begin
 end;
 
 
-function TiaWindowsProcessExecutor.StartProcess:Boolean;
+function TiaWindowsProcessExecutor.StartProcess(const pWorkingFolder:string):Boolean;
 begin
   //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-  Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, nil, fContext.StartupInfo, fContext.ProcessInfo);
+  if Trim(pWorkingFolder) = '' then
+  begin
+    Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, nil, fContext.StartupInfo, fContext.ProcessInfo);
+  end
+  else
+  begin
+    Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, PChar(pWorkingFolder), fContext.StartupInfo, fContext.ProcessInfo);
+  end;
 
   if not Result then
   begin
@@ -253,7 +260,7 @@ begin
 end;
 
 
-function ExecAndWait(const pCommandLine:string):Boolean;
+function ExecAndWait(const pCommandLine:string; const pWorkingFolder:string=''):Boolean;
 const
   WaitForCompletion = True;
 var
@@ -261,14 +268,14 @@ var
 begin
   vProcessLauncher := TiaWindowsProcessExecutor.Create;
   try
-    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion);
+    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion, pWorkingFolder);
   finally
     vProcessLauncher.Free;
   end;
 end;
 
 
-function StartProcess(const pCommandLine:string):Boolean;
+function StartProcess(const pCommandLine:string; const pWorkingFolder:string=''):Boolean;
 const
   WaitForCompletion = False;
 var
@@ -276,7 +283,7 @@ var
 begin
   vProcessLauncher := TiaWindowsProcessExecutor.Create;
   try
-    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion);
+    Result := vProcessLauncher.LaunchProcess(pCommandLine, WaitForCompletion, pWorkingFolder);
   finally
     vProcessLauncher.Free;
   end;
