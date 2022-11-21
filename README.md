@@ -1,2 +1,2 @@
 # iaLib
-Shared code library - intended for use as a git submodule in other projects
+Shared code library - used by blog posts on https://www.ideasawakened.com/blog
