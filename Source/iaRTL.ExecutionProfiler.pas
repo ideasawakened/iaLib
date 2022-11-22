@@ -27,9 +27,14 @@ type
   TiaTimerStatsArray = array of TiaTimerStats;
   TiaExportResolution = (Ticks, Milliseconds);
 
+  TiaThreadWatch = class
+  private
+    fStopWatch:TStopwatch;
+  End;
+
   TiaNamedTimer = class
   private
-    fStopwatches: array of TStopwatch;
+    fThreadWatches:TObjectDictionary<Cardinal, TiaThreadWatch>;
     fStats:TiaTimerStats;
     function GetStats:PiaTimerStats;
     procedure SetStats(const Value:PiaTimerStats);
@@ -37,6 +42,9 @@ type
     procedure StartNew;
     procedure Stop;
     property Stats:PiaTimerStats read GetStats write SetStats;
+  public
+    constructor Create;
+    destructor Destroy; override;
   end;
 
 
@@ -211,6 +219,20 @@ begin
 end;
 
 
+constructor TiaNamedTimer.Create;
+begin
+  inherited;
+  fThreadWatches := TObjectDictionary<cardinal, TiaThreadWatch>.Create([doOwnsValues]);
+end;
+
+
+destructor TiaNamedTimer.Destroy;
+begin
+  fThreadWatches.Free;
+  inherited;
+end;
+
+
 function TiaNamedTimer.GetStats:PiaTimerStats;
 begin
   Result := @fStats;
@@ -225,44 +247,51 @@ end;
 
 procedure TiaNamedTimer.StartNew;
 var
-  vStopwatch:TStopwatch;
+  vCurrentThreadId:Cardinal;
+  vThreadWatch:TiaThreadWatch;
 begin
-  vStopwatch := TStopwatch.StartNew;
-  fStopwatches := fStopwatches + [vStopwatch];
+  vCurrentThreadId := TThread.CurrentThread.ThreadID;
+  Assert(not fThreadWatches.TryGetValue(vCurrentThreadId, vThreadWatch));
+
+  vThreadWatch := TiaThreadWatch.Create;
+  fThreadWatches.Add(vCurrentThreadId, vThreadWatch);
+  vThreadWatch.fStopWatch := TStopWatch.StartNew;
 end;
 
 
 procedure TiaNamedTimer.Stop;
 var
-  vLen:Integer;
-  vStopwatch:TStopwatch;
+  vCurrentThreadId:Cardinal;
+  vThreadWatch:TiaThreadWatch;
+  vTicks:Int64;
 begin
-  vLen := Length(fStopwatches);
-  if vLen > 0 then
+  vCurrentThreadId := TThread.CurrentThread.ThreadID;
+  if fThreadWatches.TryGetValue(vCurrentThreadId, vThreadWatch) then
   begin
-    vStopwatch := fStopwatches[vLen - 1];
-    vStopwatch.Stop;
+    vThreadWatch.fStopWatch.Stop;
 
+    vTicks := vThreadWatch.fStopWatch.ElapsedTicks;
     if Stats.TotalExecutions = 0 then
     begin
-      Stats.MinTicks := vStopwatch.ElapsedTicks;
-      Stats.MaxTicks := vStopwatch.ElapsedTicks;
+      Stats.MinTicks := vTicks;
+      Stats.MaxTicks := vTicks;
     end
     else
     begin
-      if vStopwatch.ElapsedTicks < Stats.MinTicks then
+      if vTicks < Stats.MinTicks then
       begin
-        Stats.MinTicks := vStopwatch.ElapsedTicks;
+        Stats.MinTicks := vTicks;
       end;
-      if vStopwatch.ElapsedTicks > Stats.MaxTicks then
+      if vTicks > Stats.MaxTicks then
       begin
-        Stats.MaxTicks := vStopwatch.ElapsedTicks;
+        Stats.MaxTicks := vTicks;
       end;
     end;
 
     Inc(Stats.TotalExecutions);
-    Inc(Stats.ElapsedTicks, vStopwatch.ElapsedTicks);
-    System.Delete(fStopwatches, vLen - 1, 1);
+    Inc(Stats.ElapsedTicks, vTicks);
+
+    fThreadWatches.Remove(vCurrentThreadId);
   end;
 end;
 
