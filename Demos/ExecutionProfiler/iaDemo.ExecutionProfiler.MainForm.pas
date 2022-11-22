@@ -11,14 +11,24 @@ type
     butExecuteDemoCode: TButton;
     butViewCurrentStatistics: TButton;
     memLog: TMemo;
+    butExecMultiThreaded: TButton;
     procedure butExecuteDemoCodeClick(Sender: TObject);
     procedure butViewCurrentStatisticsClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure butExecMultiThreadedClick(Sender: TObject);
   private
     procedure DoSomeComplexCode;
   public
     { Public declarations }
+  end;
+
+  TMySimpleThread = class(TThread)
+  private
+    fSleepTime:Integer;
+  public
+    constructor Create(const pSleepTime:Integer);
+    procedure Execute(); override;
   end;
 
 var
@@ -111,5 +121,30 @@ begin
 end;
 
 
+//Example used for Issue #2 correction
+//https://github.com/ideasawakened/iaLib/issues/2
+procedure TDemoExecutionProfilerForm.butExecMultiThreadedClick(Sender: TObject);
+begin
+  //Before fix, this will produce incorrect results (around 1 second min and 3 second max)
+  //After fix, this should produce correct results (around 2 second min, max, average)
+  TMySimpleThread.Create(2000);
+  Sleep(1000);
+  TMySimpleThread.Create(2000);
+end;
+
+
+constructor TMySimpleThread.Create(const pSleepTime:Integer);
+begin
+  fSleepTime := pSleepTime;
+  FreeOnTerminate := True;
+  inherited Create;
+end;
+
+procedure TMySimpleThread.Execute;
+begin
+  {$IFDEF PROFILER}TiaProfiler.StartTimer('ThreadedExample1');{$ENDIF}
+  Sleep(fSleepTime);  //some time intensive code block
+  {$IFDEF PROFILER}TiaProfiler.StopTimer('ThreadedExample1');{$ENDIF}
+end;
 
 end.

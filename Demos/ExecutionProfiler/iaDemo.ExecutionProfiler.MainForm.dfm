@@ -2,7 +2,7 @@ object DemoExecutionProfilerForm: TDemoExecutionProfilerForm
   Left = 0
   Top = 0
   Caption = 'ExecutionProfiler Demo'
-  ClientHeight = 371
+  ClientHeight = 379
   ClientWidth = 492
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -33,9 +33,18 @@ object DemoExecutionProfilerForm: TDemoExecutionProfilerForm
   end
   object memLog: TMemo
     Left = 24
-    Top = 77
+    Top = 94
     Width = 449
     Height = 276
     TabOrder = 2
+  end
+  object butExecMultiThreaded: TButton
+    Left = 24
+    Top = 59
+    Width = 161
+    Height = 25
+    Caption = 'Multithreaded timing'
+    TabOrder = 3
+    OnClick = butExecMultiThreadedClick
   end
 end
