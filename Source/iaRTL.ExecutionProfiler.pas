@@ -29,7 +29,7 @@ type
 
   TiaNamedTimer = class
   private
-    fActiveTimers: array of TStopwatch;
+    fStopwatches: array of TStopwatch;
     fStats:TiaTimerStats;
     function GetStats:PiaTimerStats;
     procedure SetStats(const Value:PiaTimerStats);
@@ -225,44 +225,44 @@ end;
 
 procedure TiaNamedTimer.StartNew;
 var
-  vTimer:TStopwatch;
+  vStopwatch:TStopwatch;
 begin
-  vTimer := TStopwatch.StartNew;
-  fActiveTimers := fActiveTimers + [vTimer];
+  vStopwatch := TStopwatch.StartNew;
+  fStopwatches := fStopwatches + [vStopwatch];
 end;
 
 
 procedure TiaNamedTimer.Stop;
 var
   vLen:Integer;
-  vTimer:TStopwatch;
+  vStopwatch:TStopwatch;
 begin
-  vLen := Length(fActiveTimers);
+  vLen := Length(fStopwatches);
   if vLen > 0 then
   begin
-    vTimer := fActiveTimers[vLen - 1];
-    vTimer.Stop;
+    vStopwatch := fStopwatches[vLen - 1];
+    vStopwatch.Stop;
 
     if Stats.TotalExecutions = 0 then
     begin
-      Stats.MinTicks := vTimer.ElapsedTicks;
-      Stats.MaxTicks := vTimer.ElapsedTicks;
+      Stats.MinTicks := vStopwatch.ElapsedTicks;
+      Stats.MaxTicks := vStopwatch.ElapsedTicks;
     end
     else
     begin
-      if vTimer.ElapsedTicks < Stats.MinTicks then
+      if vStopwatch.ElapsedTicks < Stats.MinTicks then
       begin
-        Stats.MinTicks := vTimer.ElapsedTicks;
+        Stats.MinTicks := vStopwatch.ElapsedTicks;
       end;
-      if vTimer.ElapsedTicks > Stats.MaxTicks then
+      if vStopwatch.ElapsedTicks > Stats.MaxTicks then
       begin
-        Stats.MaxTicks := vTimer.ElapsedTicks;
+        Stats.MaxTicks := vStopwatch.ElapsedTicks;
       end;
     end;
 
     Inc(Stats.TotalExecutions);
-    Inc(Stats.ElapsedTicks, vTimer.ElapsedTicks);
-    System.Delete(fActiveTimers, vLen - 1, 1);
+    Inc(Stats.ElapsedTicks, vStopwatch.ElapsedTicks);
+    System.Delete(fStopwatches, vLen - 1, 1);
   end;
 end;
 
