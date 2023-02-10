@@ -4,6 +4,7 @@ interface
 
 uses
   System.Classes,
+  System.SysUtils,
   Data.Cloud.CloudAPI,
   Data.Cloud.AmazonAPI,
   iaRTL.API.Keys,
@@ -17,6 +18,7 @@ type
   TOnGetBucketObjectInfo = procedure(const BucketName:string; const S3Object:TS3Object) of object;
   TOnDownloadObjectResult = procedure(const Result:Boolean; const ObjectKey:string; const CloudResponseInfo:TCloudResponseInfo) of object;
 
+  EAmazonServiceFailure = Class(Exception);
 
   TS3Bucket = class
   private
@@ -24,7 +26,7 @@ type
     fBaseFolder:TS3Folder;
 
     fBucketName:string;
-    fRegion:string;
+    fBucketRegion:string;
     fAPIKeys:TAPIKeys;
 
     fOnGetBucketCall:TOnGetBucketCall;
@@ -32,15 +34,15 @@ type
     fOnGetBucketObjectInfo:TOnGetBucketObjectInfo;
     fOnDownloadObjectResult:TOnDownloadObjectResult;
   protected
-    procedure GetFolderDetails(const AmazonStorageService:TAmazonStorageService; const StartingFolder:TS3Folder; const Recursive:Boolean = True);
+    function GetFolderDetails(const AmazonStorageService:TAmazonStorageService; const StartingFolder:TS3Folder; const Recursive:Boolean = True):Boolean;
   public
-    constructor Create(const ABucketName:string; const ABucketRegion:string; AKeys:TAPIKeys);
+    constructor Create(const BucketName:string; const BucketRegion:string; APIKeys:TAPIKeys);
     destructor Destroy; override;
 
     /// <summary> Bucket name is globally unique within each of the three partitions. (Public, China, US-Gov)</summary>
     property BucketName:string read fBucketName;
     /// <summary> AWS region (short form), such as us-east-2</summary>
-    property Region:string read fRegion;
+    property BucketRegion:string read fBucketRegion;
     /// <summary> Populated by GetBucketObjectList where BaseFolder is the root folder of the bucket by default, but a "StartingFolderPrefix" could be specified for a partial copy</summary>
     property BaseFolder:TS3Folder read fBaseFolder;
     /// <summary> IAM Keys with appropriate S3 list/get permissions</summary>
@@ -71,24 +73,23 @@ type
 implementation
 
 uses
-  System.SysUtils,
   System.Rtti;
 
 
-constructor TS3Bucket.Create(const ABucketName:string; const ABucketRegion:string; AKeys:TAPIKeys);
+constructor TS3Bucket.Create(const BucketName:string; const BucketRegion:string; APIKeys:TAPIKeys);
 begin
-  fBucketName := ABucketName;
-  fRegion := ABucketRegion;
-  fAPIKeys := AKeys;
+  fBucketName := BucketName;
+  fBucketRegion := BucketRegion;
+  fAPIKeys := APIKeys;
 
   fBaseFolder := TS3Folder.Create;
   fAmazonConnectionInfo := TAmazonConnectionInfo.Create(nil);
   fAmazonConnectionInfo.Protocol := 'https'; // override old default of 'http'
 
   //toconsider: Make bucketname/region/apikeys properties read/write, but then need to set these before each AmazonStorageService call
-  fAmazonConnectionInfo.Region := ABucketRegion;
-  fAmazonConnectionInfo.AccountName := APIKeys.AccessKey;
-  fAmazonConnectionInfo.AccountKey := APIKeys.SecretKey;
+  fAmazonConnectionInfo.Region := fBucketRegion;
+  fAmazonConnectionInfo.AccountName := fAPIKeys.AccessKey;
+  fAmazonConnectionInfo.AccountKey := fAPIKeys.SecretKey;
 end;
 
 
@@ -129,7 +130,12 @@ begin
   CloudResponseInfo := TCloudResponseInfo.Create;
   try
 
-    Result := AmazonStorageService.GetObject(BucketName, ObjectKey, DestinationStream, CloudResponseInfo, Region);
+    Result := AmazonStorageService.GetObject(BucketName, ObjectKey, DestinationStream, CloudResponseInfo, BucketRegion);
+    if not Result then
+    begin
+      //toconsider: continue with sync
+      raise EAmazonServiceFailure.CreateFmt('Error, cannot sync this object %s.  GetObject failed: [%d] %s', [ObjectKey, CloudResponseInfo.StatusCode, CloudResponseInfo.StatusMessage]);
+    end;
 
     if Assigned(OnDownloadObjectResult) then
     begin
@@ -148,10 +154,10 @@ var
   AmazonStorageService:TAmazonStorageService;
 begin
   BaseFolder.Clear;
+  BaseFolder.FolderName := StartingFolderPrefix;
 
   AmazonStorageService := TAmazonStorageService.Create(fAmazonConnectionInfo);
   try
-    BaseFolder.FolderName := StartingFolderPrefix;
     GetFolderDetails(AmazonStorageService, BaseFolder, Recursive);
   finally
     AmazonStorageService.Free;
@@ -159,7 +165,7 @@ begin
 end;
 
 
-procedure TS3Bucket.GetFolderDetails(const AmazonStorageService:TAmazonStorageService; const StartingFolder:TS3Folder; const Recursive:Boolean = True);
+function TS3Bucket.GetFolderDetails(const AmazonStorageService:TAmazonStorageService; const StartingFolder:TS3Folder; const Recursive:Boolean = True):Boolean;
 var
   AmazonBucketResult:TAmazonBucketResult;
   CloudResponseInfo:TCloudResponseInfo;
@@ -169,6 +175,8 @@ var
   S3Object:TS3Object;
   ChildFolder:TS3Folder;
 begin
+  Result := True;
+
   BucketParameters := TStringList.Create;
   try
     BucketParameters.Values['prefix'] := StartingFolder.FolderName;
@@ -181,12 +189,19 @@ begin
       end;
 
       CloudResponseInfo := TCloudResponseInfo.Create;
-      AmazonBucketResult := AmazonStorageService.GetBucket(BucketName, BucketParameters, CloudResponseInfo, Region);
+      AmazonBucketResult := AmazonStorageService.GetBucket(BucketName, BucketParameters, CloudResponseInfo, BucketRegion);
       try
 
         if Assigned(OnGetBucketResult) then
         begin
-          OnGetBucketResult(BucketName, StartingFolder.FolderName, CloudResponseInfo, AmazonBucketResult.Prefixes.Count, AmazonBucketResult.Objects.Count);
+          if CloudResponseInfo.StatusCode >= 300 then
+          begin
+            raise EAmazonServiceFailure.CreateFmt('Cannot sync - GetBucket call failed: [%d] %s', [CloudResponseInfo.StatusCode, CloudResponseInfo.StatusMessage]);
+          end
+          else
+          begin
+            OnGetBucketResult(BucketName, StartingFolder.FolderName, CloudResponseInfo, AmazonBucketResult.Prefixes.Count, AmazonBucketResult.Objects.Count);
+          end;
         end;
 
         for i := 0 to AmazonBucketResult.Objects.Count - 1 do
@@ -232,6 +247,11 @@ initialization
 {$IFDEF CONSOLE}
 {$IF defined(MSWINDOWS)}
 // Note: this fixes the error "Microsoft MSXML is not installed" within a console project
+// Alternative solution:
+// add to uses clause:   System.Win.ComObj, WinAPI.ActiveX,
+// and initalize here
+// CoInitializeEx(nil, COINIT_APARTMENTTHREADED);
+
 // Source: https://wiert.me/2021/03/31/delphi-got-eoleexception-with-message-microsoft-msxml-is-not-installed-in-a-console-or-test-project/
 // Archive: https://web.archive.org/web/20211017034226/https://wiert.me/2021/03/31/delphi-got-eoleexception-with-message-microsoft-msxml-is-not-installed-in-a-console-or-test-project/
 if InitProc <> nil then
