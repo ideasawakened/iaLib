@@ -25,7 +25,7 @@ type
     fObjectList:TS3ObjectList;
     fChildFolders:TS3FolderList;
   public
-    constructor Create(const AFolderName:string = '');
+    constructor Create(const FolderName:string = '');
     destructor Destroy; override;
 
     procedure Clear;
@@ -43,9 +43,9 @@ uses
   System.SysUtils;
 
 
-constructor TS3Folder.Create(const AFolderName:string = '');
+constructor TS3Folder.Create(const FolderName:string = '');
 begin
-  fFolderName := AFolderName;
+  fFolderName := FolderName;
   fObjectList := TS3ObjectList.Create;
   fChildFolders := TS3FolderList.Create;
 end;
