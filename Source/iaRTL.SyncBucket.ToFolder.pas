@@ -124,8 +124,11 @@ end;
 
 procedure TSyncBucketToFolder.InitializeSync(LocalPath:string);
 begin
-  Log('Will sync to local path: ' + LocalPath);
+  Log('Initialize: Will sync to local path: ' + LocalPath);
   ForceDirectories(LocalPath);
+
+  Log('Initialize: Cleanup items marked as not found');  //should have been cleared during sync pass, but previous update could have been intentionally skipped
+  fDB.ExecSQL(Format('DELETE FROM SyncItems WHERE SyncStatus=%d', [Ord(TSyncStatus.NotFound)]));
 
   // Set special status flag of all local items - any items with this special status after the first pass is completed can be assumed to be no longer in the bucket
   Log(Format('Initialize: setting status of all items to %s', [TRttiEnumerationType.GetName(TSyncStatus.StatusCleared)]));
@@ -271,7 +274,7 @@ begin
 
         if not SkipAction then
         begin
-          Log('Found new item, need to download: ' + S3Object.ObjectKey);
+          Log(Format('Found new item, need to download %s, size %d', [S3Object.ObjectKey, S3Object.Size]));
           Bucket.DownloadObjectToFile(SyncItem.ObjectKey, LocalFileName);
           SyncItem.InsertIntoDB;
 
