@@ -206,14 +206,17 @@ begin
 
         for i := 0 to AmazonBucketResult.Objects.Count - 1 do
         begin
-          S3Object := TS3Object.Create;
-          S3Object.SetFromAmazonObjectResult(AmazonBucketResult.Objects[i]);
-          StartingFolder.ObjectList.Add(S3Object);
-
-          if Assigned(OnGetBucketObjectInfo) then
+          if not ExtractFileName(TS3Object.ObjectKeyUsingNativeDelimiter(AmazonBucketResult.Objects[i].Name)).IsEmpty then  //workaround: TODO need to track down and file QP issue why the base folder is also tagged as an object reference sometimes
           begin
-            // can possibly start processing objects before full bucket list is retrieved
-            OnGetBucketObjectInfo(BucketName, S3Object);
+            S3Object := TS3Object.Create;
+            S3Object.SetFromAmazonObjectResult(AmazonBucketResult.Objects[i]);
+            StartingFolder.ObjectList.Add(S3Object);
+
+            if Assigned(OnGetBucketObjectInfo) then
+            begin
+              // can possibly start processing objects before full bucket list is retrieved
+              OnGetBucketObjectInfo(BucketName, S3Object);
+            end;
           end;
         end;
 
