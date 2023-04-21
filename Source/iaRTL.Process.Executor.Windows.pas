@@ -17,7 +17,9 @@ limitations under the License.
 
 
 Module History
-1.1 2019-Dec-26 Darian Miller: ASL-2.0 applied, refactored
+1.3 2023-Apr-20 Darian Miller: WaitForInputIdleMaxMS no longer used unless waiting for process completion as there's no need to slow down the StartProcess completion
+1.2 2023-Apr-19 Darian Miller: Added ShowWindowState+ProcessCreationFlags
+1.1 2019-Dec-26 Darian Miller: ASL-2.0 applied, complete refactor
 1.0 2019-Dec-26 Darian Miller: Unit created using Delphi Dabbler's Public Domain code.
 }
 unit iaRTL.Process.Executor.Windows;
@@ -80,9 +82,9 @@ type
     /// <summary>
     /// Delay passed to WaitForInputIdle after launching a new process, granting the process time to startup and become idle
     /// </summary>
-    /// <remarks>(Current default is 750ms)
-    /// A minor optimization is to set this to 0 if not waiting for the process to complete and not interested in
-    /// immediately interacting with the child process.
+    /// <remarks>
+    /// Value not used unless waiting for process completion.
+    /// Current default is 750ms
     /// </remarks>
     property WaitForInputIdleMaxMS:Integer read fWaitForInputIdleMaxMS write fWaitForInputIdleMaxMS;
 
@@ -153,10 +155,10 @@ begin
   if DoCreateProcess(pWorkingFolder) then
   begin
     try
-      WaitForProcessStabilization;
-
       if pWaitForCompletion then
       begin
+        WaitForProcessStabilization;
+
         if WaitForProcessCompletion and GetExitCode then
         begin
           Result := (fContext.ExitCode = 0);
