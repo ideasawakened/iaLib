@@ -45,8 +45,10 @@ type
   private
     fContext:TiaWindowsLaunchContext;
     fWaitForInputIdleMaxMS:Integer;
+    fShowWindowState:Word;
+    fProcessCreationFlags:DWord;
   protected
-    function StartProcess(const pWorkingFolder:string):Boolean;
+    function DoCreateProcess(const pWorkingFolder:string):Boolean;
     procedure WaitForProcessStabilization;
     function WaitForProcessCompletion:Boolean;
     function GetExitCode:Boolean;
@@ -83,6 +85,18 @@ type
     /// immediately interacting with the child process.
     /// </remarks>
     property WaitForInputIdleMaxMS:Integer read fWaitForInputIdleMaxMS write fWaitForInputIdleMaxMS;
+
+    /// <summary>
+    /// The initial window state can be customized to one of the SW_xxx values used by ShowWindow calls.
+    /// For list of valid values, see: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+    /// </summary>
+    property ShowWindowState:Word read fShowWindowState write fShowWindowState;
+
+    /// <summary>
+    /// This is the dwCreationFlags parameter to CreateProcess which control the priority class and the creation of the process
+    /// For list of valid values, see: https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+    /// </summary>
+    property ProcessCreationFlags:DWord read fProcessCreationFlags write fProcessCreationFlags;
   end;
 
 
@@ -109,6 +123,8 @@ constructor TiaWindowsProcessExecutor.Create;
 begin
   inherited;
   fWaitForInputIdleMaxMS := defWaitForInputIdleMaxMS;
+  fShowWindowState := SW_SHOWDEFAULT;
+  fProcessCreationFlags := 0;  //Default: The process inherits both the error mode of the caller and the parent's console.  The environment block for the new process is assumed to contain ANSI characters (see lpEnvironment parameter for additional information).
 end;
 
 
@@ -125,19 +141,16 @@ begin
   Result := False;
 
   fContext := Default(TiaWindowsLaunchContext);
+  fContext.CommandLine := pCommandLine;
   fContext.StartupInfo.cb := SizeOf(fContext.StartupInfo);
 
-  // see: http://edn.embarcadero.com/article/38693
-  // The Unicode version of this function, CreateProcessW, can modify the contents of this string.
-  // Therefore, this parameter cannot be a pointer to read-only memory (such as a const variable or a literal string).
-  // If this parameter is a constant string, the function may cause an access violation
-  // also: https://stackoverflow.com/questions/6705532/access-violation-in-function-createprocess-in-delphi-2009
-  // which references using UniqueString
-  fContext.CommandLine := pCommandLine;
-  UniqueString(fContext.CommandLine);
+  if ShowWindowState <> SW_SHOWDEFAULT then
+  begin
+    fContext.StartupInfo.dwFlags := fContext.StartupInfo.dwFlags or STARTF_USESHOWWINDOW;
+    fContext.StartupInfo.wShowWindow := ShowWindowState;  //SW_HIDE, SW_SHOWNORMAL...
+  end;
 
-  //todo: Event for customizing StartupInfo
-  if StartProcess(pWorkingFolder) then
+  if DoCreateProcess(pWorkingFolder) then
   begin
     try
       WaitForProcessStabilization;
@@ -160,24 +173,37 @@ begin
 end;
 
 
-function TiaWindowsProcessExecutor.StartProcess(const pWorkingFolder:string):Boolean;
+function TiaWindowsProcessExecutor.DoCreateProcess(const pWorkingFolder:string):Boolean;
+var
+  CurrentDirectory:PChar;
+  CmdLine:string;
 begin
-  //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
-  if Trim(pWorkingFolder) = '' then
+  if pWorkingFolder = '' then
   begin
-    Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, nil, fContext.StartupInfo, fContext.ProcessInfo);
+    CurrentDirectory := nil;
   end
   else
   begin
-    Result := CreateProcess(nil, PChar(fContext.CommandLine), nil, nil, False, 0, nil, PChar(pWorkingFolder), fContext.StartupInfo, fContext.ProcessInfo);
+    CurrentDirectory := PChar(pWorkingFolder);
   end;
+
+  // see: http://edn.embarcadero.com/article/38693
+  // The Unicode version of this function, CreateProcessW, can modify the contents of this string.
+  // Therefore, this parameter cannot be a pointer to read-only memory (such as a const variable or a literal string).
+  // If this parameter is a constant string, the function may cause an access violation
+  // also: https://stackoverflow.com/questions/6705532/access-violation-in-function-createprocess-in-delphi-2009
+  // which references using UniqueString
+  CmdLine := fContext.CommandLine;
+  UniqueString(CmdLine);   //https://stackoverflow.com/a/6707533
+
+  //API: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw
+  Result := CreateProcess(nil, PChar(CmdLine), nil, nil, False, ProcessCreationFlags, nil, CurrentDirectory, fContext.StartupInfo, fContext.ProcessInfo);
 
   if not Result then
   begin
     CaptureSystemError;
   end;
 end;
-
 
 procedure TiaWindowsProcessExecutor.WaitForProcessStabilization;
 begin
