@@ -17,6 +17,7 @@ limitations under the License.
 
 
 Module History
+1.4 2023-Apr-20 Darian Miller: Removed API - no current plans of supporting other Operating Systems, but do have plans on more features for MS Windows
 1.3 2023-Apr-20 Darian Miller: WaitForInputIdleMaxMS no longer used unless waiting for process completion as there's no need to slow down the StartProcess completion
 1.2 2023-Apr-19 Darian Miller: Added ShowWindowState+ProcessCreationFlags
 1.1 2019-Dec-26 Darian Miller: ASL-2.0 applied, complete refactor
@@ -26,8 +27,7 @@ unit iaRTL.Process.Executor.Windows;
 
 interface
 uses
-  WinAPI.Windows,
-  iaRTL.Process.Executor.API;
+  WinAPI.Windows;
 
 type
 
@@ -41,7 +41,7 @@ type
   end;
 
 
-  TiaWindowsProcessExecutor = class(TInterfacedObject, IAProcessExecutor)
+  TiaWindowsProcessExecutor = class
   private const
     defWaitForInputIdleMaxMS = 750;
   private
