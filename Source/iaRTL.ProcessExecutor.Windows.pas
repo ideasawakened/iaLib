@@ -23,7 +23,7 @@ Module History
 1.1 2019-Dec-26 Darian Miller: ASL-2.0 applied, complete refactor
 1.0 2019-Dec-26 Darian Miller: Unit created using Delphi Dabbler's Public Domain code.
 }
-unit iaRTL.Process.Executor.Windows;
+unit iaRTL.ProcessExecutor.Windows;
 
 interface
 uses
