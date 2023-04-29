@@ -71,11 +71,15 @@ type
   {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
   TiaThread = class(TThread)
   private
+    fThreadNameForDebugger:String;
+    fLastThreadNameForDebugger:String;
     fThreadState:TiaThreadState;
     fStateChangeLock:TCriticalSection;
 
     fExecOptionInt:Integer;
+    {$IFDEF MSWINDOWS}
     fRequireCoinitialize:Boolean;
+    {$ENDIF}
 
     fProgressTextToReport:String;
     fTrappedException:Exception;
@@ -142,7 +146,7 @@ type
     /// This is executed within the main thread's context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure Sync_CallOnReportProgress();
+    procedure Sync_CallOnReportProgress;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, Sync_CallOnRunCompletion, is meant to be protected
@@ -154,7 +158,7 @@ type
     /// This is executed within the main thread's context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure Sync_CallOnRunCompletion();
+    procedure Sync_CallOnRunCompletion;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, Sync_CallOnException, is meant to be protected
@@ -166,7 +170,7 @@ type
     /// This is executed within the main thread's context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure Sync_CallOnException();
+    procedure Sync_CallOnException;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, DoOnRunCompletion, sets up the call to properly
@@ -177,7 +181,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure DoOnRunCompletion();
+    procedure DoOnRunCompletion;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, DoOnException, sets up the call to properly
@@ -188,7 +192,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure DoOnException();
+    procedure DoOnException;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, CallSynchronize, calls the TThread.Synchronize
@@ -226,7 +230,7 @@ type
     /// This is executed by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure Execute(); override;
+    procedure Execute; override;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The Virtual protected method, BeforeRun, is an empty stub versus an
@@ -238,7 +242,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$ENDREGION}
-    procedure BeforeRun(); virtual;      // Override as needed
+    procedure BeforeRun; virtual;      // Override as needed
     ///<summary>
     /// The Virtual protected method, BetweenRuns, is an empty stub versus an
     /// abstract method to allow for optional use by descendants.
@@ -249,7 +253,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$ENDREGION}
-    procedure BetweenRuns(); virtual;      // Override as needed
+    procedure BetweenRuns; virtual;      // Override as needed
 
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -262,7 +266,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure Run(); virtual; ABSTRACT;
+    procedure Run; virtual; ABSTRACT;
 
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -275,7 +279,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure AfterRun(); virtual;
+    procedure AfterRun; virtual;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The Virtual protected method, WaitForResume, is called when this thread
@@ -287,7 +291,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure WaitForResume(); virtual;
+    procedure WaitForResume; virtual;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The Virtual protected method, ThreadHasResumed, is called when this
@@ -298,7 +302,7 @@ type
     /// This is called internally by Self within its own context.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure ThreadHasResumed(); virtual;
+    procedure ThreadHasResumed; virtual;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The Virtual protected method, ExternalRequestToStop, is an empty stub
@@ -364,7 +368,9 @@ type
     /// event so the only time to properly set this is in the constructor)
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
+    {$IFDEF MSWINDOWS}
     property RequireCoinitialize:Boolean read fRequireCoinitialize write fRequireCoinitialize;
+    {$ENDIF}
   public
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -377,7 +383,7 @@ type
     /// This is executed within the calling thread's context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    constructor Create();
+    constructor Create;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// Public destructor for TiaThread, a descendant of TThread.
@@ -389,7 +395,7 @@ type
     /// OR within the threads context if auto-freeing itself
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    destructor Destroy(); override;
+    destructor Destroy; override;
 
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -447,6 +453,7 @@ type
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
     function ThreadIsActive():Boolean;
+    property ThreadNameForDebugger:String read fThreadNameForDebugger write fThreadNameForDebugger;
 
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -523,18 +530,18 @@ uses
   {$ENDIF}
 
 
-constructor TiaThread.Create();
+constructor TiaThread.Create;
 begin
   inherited Create(True); //We always create suspended, user must always call Start()
 
   fThreadState := tsSuspended_NotYetStarted;
-  fStateChangeLock := TCriticalSection.Create();
+  fStateChangeLock := TCriticalSection.Create;
   fAbortableSleepEvent := TEvent.Create(nil, True, False, '');
   fResumeSignal := TEvent.Create(nil, True, False, '');
 end;
 
 
-destructor TiaThread.Destroy();
+destructor TiaThread.Destroy;
 begin
   Terminate;
   if fThreadState <> tsSuspended_NotYetStarted then
@@ -543,6 +550,7 @@ begin
     fAbortableSleepEvent.SetEvent;
     fResumeSignal.SetEvent;
   end;
+  inherited;
 
   fStateChangeLock.Free;
   fResumeSignal.Free;
@@ -550,29 +558,40 @@ begin
 end;
 
 
-procedure TiaThread.Execute();
+procedure TiaThread.Execute;
 begin
   try //except
   
+    if Length(fThreadNameForDebugger) > 0 then
+    begin
+      if fThreadNameForDebugger <> fLastThreadNameForDebugger then  //NameThreadForDebugging only called as needed
+      begin
+        fLastThreadNameForDebugger := fThreadNameForDebugger;
+        NameThreadForDebugging(fThreadNameForDebugger);
+      end;
+    end;
+
     while not Terminated do
     begin
+      {$IFDEF MSWINDOWS}
       if fRequireCoinitialize then
       begin
         CoInitialize(nil);
       end;
       try
-        ThreadHasResumed();
-        BeforeRun();
+      {$ENDIF}
+        ThreadHasResumed;
+        BeforeRun;
         try
-          while ThreadIsActive() do // check for stop, externalstop, terminate
+          while ThreadIsActive do // check for stop, externalstop, terminate
           begin
-            Run(); //descendant's code
-            DoOnRunCompletion();
+            Run; //descendant's code
+            DoOnRunCompletion;
 
             case ExecOption of
             teRepeatRun:
               begin
-                BetweenRuns();
+                BetweenRuns;
                 //then loop
               end;
             teRunThenSuspend:
@@ -583,21 +602,23 @@ begin
             teRunThenFree:
               begin
                 FreeOnTerminate := True;
-                Terminate();
+                Terminate;
                 Break;
               end;
             end;
           end; //while ThreadIsActive()
         finally
-          AfterRun();
+          AfterRun;
         end;
+      {$IFDEF MSWINDOWS}
       finally
         if fRequireCoinitialize then
         begin
           //ensure this is called if thread is to be suspended
-          CoUnInitialize();
+          CoUnInitialize;
         end;
       end;
+      {$ENDIF}
 
       //Thread entering wait state
       WaitForResume;
@@ -610,13 +631,13 @@ begin
     on E:Exception do
     begin
       fTrappedException := E;
-      DoOnException();
+      DoOnException;
     end;
   end;
 end;
 
 
-procedure TiaThread.WaitForResume();
+procedure TiaThread.WaitForResume;
 begin
   fStateChangeLock.Enter;
   try
@@ -629,8 +650,8 @@ begin
       fThreadState := tsSuspended_RunOnceCompleted;
     end;
 
-    fResumeSignal.ResetEvent();
-    fAbortableSleepEvent.ResetEvent();
+    fResumeSignal.ResetEvent;
+    fAbortableSleepEvent.ResetEvent;
   finally
     fStateChangeLock.Leave;
   end;
@@ -639,12 +660,12 @@ begin
 end;
 
 
-procedure TiaThread.ThreadHasResumed();
+procedure TiaThread.ThreadHasResumed;
 begin
   //If we resumed a stopped thread, then a reset event is needed as it
   //was set to trigger out of any pending sleeps to pause the thread
-  fAbortableSleepEvent.ResetEvent();
-  fResumeSignal.ResetEvent();
+  fAbortableSleepEvent.ResetEvent;
+  fResumeSignal.ResetEvent;
 end;
 
 
@@ -655,19 +676,19 @@ begin
 end;
 
 
-procedure TiaThread.BeforeRun();
+procedure TiaThread.BeforeRun;
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
 
 
-procedure TiaThread.BetweenRuns();
+procedure TiaThread.BetweenRuns;
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
 
 
-procedure TiaThread.AfterRun();
+procedure TiaThread.AfterRun;
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
@@ -680,7 +701,7 @@ begin
     try
       ExecOption := pExecOption;
 
-      Result := CanBeStarted();
+      Result := CanBeStarted;
       if Result then
       begin
         if fThreadState = tsSuspended_NotYetStarted then
@@ -689,16 +710,16 @@ begin
           //We haven't started Exec loop at all yet
           //Since we start all threads in suspended state, we need one initial Resume()
          {$IFDEF IA_TThread_Deprecated_Resume}
-           inherited Start();
+           inherited Start;
          {$ELSE}
-           Resume();
+           Resume;
          {$ENDIF}
         end
         else
         begin
           fThreadState := tsActive;
           //we're waiting on Exec, wake up and continue processing
-          fResumeSignal.SetEvent();
+          fResumeSignal.SetEvent;
         end;
       end;
     finally
@@ -750,14 +771,14 @@ begin
     //which is why you should use self.Sleep(x) instead of windows.sleep(x)
     //AND why the sleep between iterations (if any) in the RUN should be the
     //last line, and not the first line.
-    fAbortableSleepEvent.SetEvent();
+    fAbortableSleepEvent.SetEvent;
   finally
     fStateChangeLock.Leave;
   end;
 end;
 
 
-procedure TiaThread.Sync_CallOnRunCompletion();
+procedure TiaThread.Sync_CallOnRunCompletion;
 begin
   if not Terminated then
   begin
@@ -766,7 +787,7 @@ begin
 end;
 
 
-procedure TiaThread.DoOnRunCompletion();
+procedure TiaThread.DoOnRunCompletion;
 begin
   if Assigned(fOnRunCompletion) then
   begin
@@ -775,7 +796,7 @@ begin
 end;
 
 
-procedure TiaThread.Sync_CallOnException();
+procedure TiaThread.Sync_CallOnException;
 begin
   if not Terminated then
   begin
@@ -784,7 +805,7 @@ begin
 end;
 
 
-procedure TiaThread.DoOnException();
+procedure TiaThread.DoOnException;
 begin
   if Assigned(fOnException) then
   begin
@@ -869,11 +890,11 @@ end;
 
 procedure TiaThread.CallSynchronize(const pMethod:TThreadMethod);
 begin
-  Synchronize(pMethod);
+  Queue(pMethod);  //Unlike Synchronize, execution of the current thread is allowed to continue. The main thread will eventually process all queued methods.
 end;
 
 
-procedure TiaThread.Sync_CallOnReportProgress();
+procedure TiaThread.Sync_CallOnReportProgress;
 begin
   if not Terminated then
   begin
@@ -923,7 +944,7 @@ begin
       end;
     WAIT_OBJECT_0 + 1:
       begin
-        fAbortableSleepEvent.ResetEvent(); //likely a stop received while we are waiting for an external handle
+        fAbortableSleepEvent.ResetEvent; //likely a stop received while we are waiting for an external handle
         Break;
       end;
     WAIT_FAILED:
