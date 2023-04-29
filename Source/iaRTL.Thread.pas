@@ -29,14 +29,13 @@ uses
   System.SysUtils,
   System.Classes,
   System.SyncObjs,
-  Winapi.Windows,
+  Winapi.Windows;
   {$ELSE}
   SysUtils,
   Classes,
   SyncObjs,
-  Windows,
+  Windows;
   {$ENDIF}
-  dxLib_ProcessLock;
 
 
 type
@@ -75,7 +74,7 @@ type
   TiaThread = class(TThread)
   private
     fThreadState:TiaThreadState;
-    fStateChangeLock:TdxProcessResourceLock;
+    fStateChangeLock:TCriticalSection;
 
     fExecOptionInt:Integer;
     fRequireCoinitialize:Boolean;
@@ -525,7 +524,7 @@ begin
   inherited Create(True); //We always create suspended, user must always call Start()
 
   fThreadState := tsSuspended_NotYetStarted;
-  fStateChangeLock := TdxProcessResourceLock.Create();
+  fStateChangeLock := TCriticalSection.Create();
   fAbortableSleepEvent := TEvent.Create(nil, True, False, '');
   fResumeSignal := TEvent.Create(nil, True, False, '');
 end;
@@ -552,14 +551,14 @@ begin
     end;
   end;
 
-  Terminate();
-  fAbortableSleepEvent.SetEvent();
-  fResumeSignal.SetEvent();
+  Terminate;
+  fAbortableSleepEvent.SetEvent;
+  fResumeSignal.SetEvent;
   inherited;
 
-  fStateChangeLock.Free();
-  fResumeSignal.Free();
-  fAbortableSleepEvent.Free();
+  fStateChangeLock.Free;
+  fResumeSignal.Free;
+  fAbortableSleepEvent.Free;
 end;
 
 
@@ -639,7 +638,7 @@ end;
 
 procedure TiaThread.WaitForResume();
 begin
-  fStateChangeLock.Lock();
+  fStateChangeLock.Enter;
   try
     if fThreadState = tsSuspendPending_StopRequestReceived then
     begin
@@ -653,7 +652,7 @@ begin
     fResumeSignal.ResetEvent();
     fAbortableSleepEvent.ResetEvent();
   finally
-    fStateChangeLock.Unlock();
+    fStateChangeLock.Leave;
   end;
 
   WaitForHandle(fResumeSignal.Handle);
@@ -696,7 +695,7 @@ end;
 
 function TiaThread.Start(const pExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
 begin
-  if fStateChangeLock.TryLock() then
+  if fStateChangeLock.TryEnter then
   begin
     try
       ExecOption := pExecOption;
@@ -723,7 +722,7 @@ begin
         end;
       end;
     finally
-      fStateChangeLock.Unlock();
+      fStateChangeLock.Leave;
     end;
   end
   else //thread is not asleep
@@ -737,7 +736,7 @@ function TiaThread.Stop():Boolean;
 begin
   if ExecOption <> teRunThenFree then
   begin
-    fStateChangeLock.Lock();
+    fStateChangeLock.Enter;
     try
       if ThreadIsActive() then
       begin
@@ -749,7 +748,7 @@ begin
         Result := False;
       end;
     finally
-      fStateChangeLock.Unlock();
+      fStateChangeLock.Leave;
     end;
   end
   else
@@ -763,7 +762,7 @@ end;
 
 procedure TiaThread.SuspendThread(const pReason:TiaThreadState);
 begin
-  fStateChangeLock.Lock();
+  fStateChangeLock.Enter;
   try
     fThreadState := pReason; //will auto-suspend thread in Exec
 
@@ -773,7 +772,7 @@ begin
     //last line, and not the first line.
     fAbortableSleepEvent.SetEvent();
   finally
-    fStateChangeLock.Unlock();
+    fStateChangeLock.Leave;
   end;
 end;
 
@@ -811,11 +810,11 @@ begin
   begin
     CallSynchronize(Sync_CallOnException);
   end;
-  fStateChangeLock.Lock();
+  fStateChangeLock.Enter;
   try
     fThreadState := tsAbortedDueToException;
   finally
-    fStateChangeLock.Unlock();
+    fStateChangeLock.Leave;
   end;
   fTrappedException := nil;
 end;
@@ -823,7 +822,7 @@ end;
 
 function TiaThread.GetThreadState():TiaThreadState;
 begin
-  fStateChangeLock.Lock();
+  fStateChangeLock.Enter;
   try
     if Terminated then
     begin
@@ -835,7 +834,7 @@ begin
     end;
     Result := fThreadState;
   finally
-    fStateChangeLock.Unlock();
+    fStateChangeLock.Leave;
   end;
 end;
 
@@ -862,7 +861,7 @@ begin
   end;
 
 
-  if fStateChangeLock.TryLock() then
+  if fStateChangeLock.TryEnter then
   begin
     try
       Result := (not Terminated) and
@@ -871,7 +870,7 @@ begin
                                   tsSuspended_RunOnceCompleted]);
 
     finally
-      fStateChangeLock.UnLock();
+      fStateChangeLock.Leave;
     end;
   end
   else //thread isn't asleep
