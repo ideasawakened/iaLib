@@ -19,7 +19,7 @@ limitations under the License.
 Module History
   2.0 2023-04-29 Darian Miller: Migrated from old D5-compatible DXLib to iaLib for future work
 }
-unit iaRTL.Thread;
+unit iaRTL.Threading;
 
 interface
 
