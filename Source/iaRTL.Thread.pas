@@ -87,7 +87,6 @@ type
 
     fAbortableSleepEvent:TEvent;
     fResumeSignal:TEvent;
-    fAwakeToFreeEvent:TEvent;
 
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -512,11 +511,10 @@ implementation
 
 uses
   {$IFDEF IA_UnitScopeNames}
-  WinApi.ActiveX,
+  WinApi.ActiveX;
   {$ELSE}
-  ActiveX,
+  ActiveX;
   {$ENDIF}
-  dxLib_WinApi;
 
 
 constructor TiaThread.Create();
@@ -532,29 +530,13 @@ end;
 
 destructor TiaThread.Destroy();
 begin
-  if fThreadState = tsSuspended_NotYetStarted then
-  begin
-    //Workaround for issue of freeing a non-started thread that was created in suspended mode
-    fAwakeToFreeEvent := TEvent.Create(nil, True, False, '');
-    try
-      Start();
-      if GetCurrentThreadID = MainThreadID then
-      begin
-        WaitWithMessageLoop(fAwakeToFreeEvent.Handle, INFINITE);
-      end
-      else
-      begin
-        fAwakeToFreeEvent.WaitFor(INFINITE);
-      end;
-    finally
-      FreeAndNil(fAwakeToFreeEvent);
-    end;
-  end;
-
   Terminate;
-  fAbortableSleepEvent.SetEvent;
-  fResumeSignal.SetEvent;
-  inherited;
+  if fThreadState <> tsSuspended_NotYetStarted then
+  begin
+    //if the thread is asleep...tell it to wake up so we can exit
+    fAbortableSleepEvent.SetEvent;
+    fResumeSignal.SetEvent;
+  end;
 
   fStateChangeLock.Free;
   fResumeSignal.Free;
@@ -566,14 +548,6 @@ procedure TiaThread.Execute();
 begin
   try //except
   
-    if Assigned(fAwakeToFreeEvent) then
-    begin
-      //We've awoken a thread created in Suspend mode simply to free it
-      fAwakeToFreeEvent.SetEvent();
-      Terminate();
-      Exit;
-    end;
-
     while not Terminated do
     begin
       if fRequireCoinitialize then
@@ -853,14 +827,6 @@ end;
 
 function TiaThread.CanBeStarted():Boolean;
 begin
-  if Assigned(fAwakeToFreeEvent) then
-  begin
-    //special case - wake up suspended thread simply to shutdown/free
-    Result := True;
-    Exit;
-  end;
-
-
   if fStateChangeLock.TryEnter then
   begin
     try
@@ -952,7 +918,7 @@ begin
       end;
     WAIT_FAILED:
        begin
-         RaiseLastWindowsError();
+         RaiseLastOSError;
        end;
     end;
   end; //while not Terminated
