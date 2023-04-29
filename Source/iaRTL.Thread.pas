@@ -22,10 +22,10 @@ Module History
 unit iaRTL.Thread;
 
 interface
-{$I dxLib.inc}
+{$I iaLib.inc}
 
 uses
-  {$IFDEF DX_UnitScopeNames}
+  {$IFDEF IA_UnitScopeNames}
   System.SysUtils,
   System.Classes,
   System.SyncObjs,
@@ -512,7 +512,7 @@ type
 implementation
 
 uses
-  {$IFDEF DX_UnitScopeNames}
+  {$IFDEF IA_UnitScopeNames}
   WinApi.ActiveX,
   {$ELSE}
   ActiveX,
@@ -709,7 +709,7 @@ begin
           fThreadState := tsActive;
           //We haven't started Exec loop at all yet
           //Since we start all threads in suspended state, we need one initial Resume()
-         {$IFDEF DX_TThread_Deprecated_Resume}
+         {$IFDEF IA_TThread_Deprecated_Resume}
            inherited Start();
          {$ELSE}
            Resume();
