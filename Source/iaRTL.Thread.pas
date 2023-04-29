@@ -72,7 +72,6 @@ type
     fRequireCoinitialize:Boolean;
     {$ENDIF}
 
-    fProgressTextToReport:String;
     fTrappedException:Exception;
     fOnException:TiaExceptionEvent;
     fOnRunCompletion:TiaNotifyThreadEvent;
@@ -80,6 +79,9 @@ type
 
     fAbortableSleepEvent:TEvent;
     fResumeSignal:TEvent;
+
+    fOnProgressLock:TCriticalSection;
+    fProgressReportsToSend:TArray<string>;
 
 
     ///<summary>
@@ -487,6 +489,8 @@ begin
   fStateChangeLock := TCriticalSection.Create;
   fAbortableSleepEvent := TEvent.Create(nil, True, False, '');
   fResumeSignal := TEvent.Create(nil, True, False, '');
+  fOnProgressLock := TCriticalSection.Create;
+  fProgressReportsToSend := nil;
 end;
 
 
@@ -504,6 +508,7 @@ begin
   fStateChangeLock.Free;
   fResumeSignal.Free;
   fAbortableSleepEvent.Free;
+  fOnProgressLock.Free;
 end;
 
 
@@ -840,10 +845,22 @@ end;
 
 
 procedure TiaThread.Sync_CallOnReportProgress;
+var
+  ProgressText:string;
 begin
   if not Terminated then
   begin
-    fOnReportProgress(fProgressTextToReport);
+    fOnProgressLock.Enter;  //we are currently in the main thread - manage access to fProgressReportsToSend with worker thread that may want to add another progress report
+    try
+      if Length(fProgressReportsToSend) > 0 then
+      begin
+        ProgressText := fProgressReportsToSend[0]; //FIFO
+        Delete(fProgressReportsToSend, 0, 1);
+      end;
+    finally
+      fOnProgressLock.Leave;
+    end;
+    fOnReportProgress(ProgressText);
   end;
 end;
 
@@ -852,8 +869,13 @@ procedure TiaThread.ReportProgress(const pAnyProgressText:String);
 begin
   if Assigned(fOnReportProgress) then
   begin
-    fProgressTextToReport := pAnyProgressText;
-    CallSynchronize(Sync_CallOnReportProgress);
+    fOnProgressLock.Enter;   //we are currently in the worker thread - manage access to fProgressReportsToSend with main thread that may be dequeing a previous progress report right now
+    try
+      fProgressReportsToSend := fProgressReportsToSend + [pAnyProgressText];
+      CallSynchronize(Sync_CallOnReportProgress);
+    finally
+      fOnProgressLock.Leave;
+    end;
   end;
 end;
 
