@@ -55,10 +55,10 @@ type
   ///  A TThread that can be managed (started/stopped) externally
   ///</summary>
   ///<remarks>
-  /// 2 main differences from TThread:
-  ///   1):Descendants must override the Run() method.
-  ///   2):Replace checking for Terminated in descendant Run loop with ThreadIsActive()
-  ///   3):Instead of using Windows.Sleep(), utlize the thread's Sleep() method so it can be aborted on thread shutdown
+  /// Main differences from TThread:
+  ///   1) Descendants must override the Run method.
+  ///   2) Replace checking for Terminated in descendant Run loop with ThreadIsActive
+  ///   3) Instead of using Windows.Sleep, utlize the thread's Sleep method so it can be aborted on thread shutdown
   ///</remarks>
   TiaThread = class(TThread)
   private
@@ -91,7 +91,7 @@ type
     /// Context Note:
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
-    function GetThreadState():TiaThreadState;
+    function GetThreadState:TiaThreadState;
 
     ///<summary>
     /// The private getter method, GetExecOption, is used to read the current
@@ -101,7 +101,7 @@ type
     /// Context Note:
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
-    function GetExecOption():TiaThreadExecOption;
+    function GetExecOption:TiaThreadExecOption;
 
     ///<summary>
     /// The private setter method, SetExecOption, is used to write the current
@@ -202,7 +202,7 @@ type
     /// The protected method, Execute, overrides TThread()'s abstract Execute
     /// method with common logic for handling thread descendants.  Instead of
     /// typical Delphi behavior of overriding Execute(), descendants should
-    /// override the abstract Run() method and also check for ThreadIsActive
+    /// override the abstract Run method and also check for ThreadIsActive
     /// versus checking for Terminated.
     ///</summary>
     ///<remarks>
@@ -287,7 +287,7 @@ type
     /// This is referenced within the thread-safe GetThreadState call by either
     /// outside threads OR by Self within its own context
     ///</remarks>
-    function ExternalRequestToStop():Boolean; virtual;
+    function ExternalRequestToStop:Boolean; virtual;
 
     ///<summary>
     /// The protected method, ReportProgress, is meant to be reused by
@@ -328,8 +328,8 @@ type
     {$IFDEF MSWINDOWS}
     ///<summary>
     /// The protected property, RequireCoinitialize, is available for
-    /// descendants as a flag to execute CoInitialize() before the thread Run
-    /// loop and CoUnitialize() after the thread Run loop.
+    /// descendants as a flag to execute CoInitialize before the thread Run
+    /// loop and CoUnitialize after the thread Run loop.
     ///</summary>
     ///<remarks>
     /// Context Note:
@@ -385,7 +385,7 @@ type
     /// The public method, Stop, is a thread-safe way to deactivate a running
     /// thread.  The thread will continue operation until it has a chance to
     /// check the active status.
-    /// Note:  Stop() is not intended for use if ExecOption is teRunThenFree.
+    /// Note:  Stop is not intended for use if ExecOption is teRunThenFree.
     ///
     /// This method will return without waiting for the thread to actually stop
     ///</summary>
@@ -393,27 +393,27 @@ type
     /// Context Note:
     /// This is executed within the calling thread's context
     ///</remarks>
-    function Stop():Boolean;
+    function Stop:Boolean;
 
     ///<summary>
-    /// The public method, CanBeStarted() is a thread-safe method to determine
+    /// The public method, CanBeStarted is a thread-safe method to determine
     /// if the thread is able to be resumed at the moment.
     ///</summary>
     ///<remarks>
     /// Context Note:
     /// This is executed within the calling thread's context
     ///</remarks>
-    function CanBeStarted():Boolean;
+    function CanBeStarted:Boolean;
 
     ///<summary>
-    /// The public method, ThreadIsActive() is a thread-safe method to determine
+    /// The public method, ThreadIsActive is a thread-safe method to determine
     /// if the thread is actively running the assigned task.
     ///</summary>
     ///<remarks>
     /// Context Note:
     /// This is referenced by outside threads OR by Self within its own context
     ///</remarks>
-    function ThreadIsActive():Boolean;
+    function ThreadIsActive:Boolean;
 
     property ThreadNameForDebugger:String read fThreadNameForDebugger write fThreadNameForDebugger;
 
@@ -678,13 +678,13 @@ begin
 end;
 
 
-function TiaThread.Stop():Boolean;
+function TiaThread.Stop:Boolean;
 begin
   if ExecOption <> teRunThenFree then
   begin
     fStateChangeLock.Enter;
     try
-      if ThreadIsActive() then
+      if ThreadIsActive then
       begin
         Result := True;
         SuspendThread(tsSuspendPending_StopRequestReceived);
@@ -766,7 +766,7 @@ begin
 end;
 
 
-function TiaThread.GetThreadState():TiaThreadState;
+function TiaThread.GetThreadState:TiaThreadState;
 begin
   fStateChangeLock.Enter;
   try
@@ -774,7 +774,7 @@ begin
     begin
       fThreadState := tsTerminated;
     end
-    else if ExternalRequestToStop() then  //used by central Thread Manager
+    else if ExternalRequestToStop then  //used by central Thread Manager
     begin
       fThreadState := tsSuspendPending_StopRequestReceived;
     end;
@@ -785,7 +785,7 @@ begin
 end;
 
 
-function TiaThread.GetExecOption():TiaThreadExecOption;
+function TiaThread.GetExecOption:TiaThreadExecOption;
 begin
   Result := TiaThreadExecOption(System.AtomicCmpExchange(fExecOptionInt, 0, 0));
 end;
@@ -797,7 +797,7 @@ begin
 end;
 
 
-function TiaThread.CanBeStarted():Boolean;
+function TiaThread.CanBeStarted:Boolean;
 begin
   if fStateChangeLock.TryEnter then
   begin
@@ -818,7 +818,7 @@ begin
 end;
 
 
-function TiaThread.ThreadIsActive():Boolean;
+function TiaThread.ThreadIsActive:Boolean;
 begin
   Result := (not Terminated) and (ThreadState = tsActive);
 end;
