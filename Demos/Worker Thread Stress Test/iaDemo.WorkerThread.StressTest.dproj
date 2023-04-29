@@ -112,6 +112,7 @@
         <DCCReference Include="..\..\Source\iaRTL.Logging.pas"/>
         <DCCReference Include="..\..\Source\iaRTL.Threading.LoggedWorker.pas"/>
         <DCCReference Include="..\..\Source\iaRTL.Threading.pas"/>
+        <DCCReference Include="..\..\Source\iaRTL.NameDelphiThreads.Windows.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

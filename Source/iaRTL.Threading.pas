@@ -405,6 +405,11 @@ type
     /// </remarks>
     function ThreadIsActive:Boolean;
 
+    /// <remarks>
+    ///  Note: use ASCII characters only until this bug is fixed (if ever) https://quality.embarcadero.com/browse/RSP-17452
+    ///  iOS issues fixed in 11.1 https://quality.embarcadero.com/browse/RSP-29625
+    ///  Linux issues fixed in 11.1 https://quality.embarcadero.com/browse/RSP-22083
+    /// </remarks>
     property ThreadNameForDebugger:string read fThreadNameForDebugger write fThreadNameForDebugger;
 
     /// <summary>

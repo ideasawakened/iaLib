@@ -8,7 +8,8 @@ uses
   iaRTL.Logging.Debugger.Windows in '..\..\Source\iaRTL.Logging.Debugger.Windows.pas',
   iaRTL.Logging in '..\..\Source\iaRTL.Logging.pas',
   iaRTL.Threading.LoggedWorker in '..\..\Source\iaRTL.Threading.LoggedWorker.pas',
-  iaRTL.Threading in '..\..\Source\iaRTL.Threading.pas';
+  iaRTL.Threading in '..\..\Source\iaRTL.Threading.pas',
+  iaRTL.NameDelphiThreads.Windows in '..\..\Source\iaRTL.NameDelphiThreads.Windows.pas';
 
 {$R *.res}
 
