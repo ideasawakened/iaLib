@@ -56,9 +56,9 @@ type
   ///</summary>
   ///<remarks>
   /// Main differences from TThread:
-  ///   1) Descendants must override the Run method.
-  ///   2) Replace checking for Terminated in descendant Run loop with ThreadIsActive
-  ///   3) Instead of using Windows.Sleep, utlize the thread's Sleep method so it can be aborted on thread shutdown
+  ///   1) Override the "Run" method instead of Execute.
+  ///   2) Replace checking for "Terminated" with "ThreadIsActive"
+  ///   3) Instead of using "Windows.Sleep", utilize this thread's "Sleep" method so it can be aborted when thread shutdown detected (for quicker thread termination)
   ///</remarks>
   TiaThread = class(TThread)
   private
@@ -113,7 +113,7 @@ type
     /// Context Note:
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
-    procedure SetExecOption(const pVal:TiaThreadExecOption);
+    procedure SetExecOption(const NewValue:TiaThreadExecOption);
 
     ///<summary>
     /// The private method, SuspendThread, is use to deactivate an active
@@ -123,7 +123,7 @@ type
     /// Context Note:
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
-    procedure SuspendThread(const pReason:TiaThreadState);
+    procedure SuspendThread(const SuspendReason:TiaThreadState);
 
     ///<summary>
     /// The private method, Sync_CallOnReportProgress, is meant to be protected
@@ -179,14 +179,14 @@ type
     procedure DoOnException;
 
     ///<summary>
-    /// The private method, CallSynchronize, calls the TThread.Synchronize
+    /// The private method, CallQueue, calls the TThread.Queue
     /// method using the passed in TThreadMethod parameter.
     ///</summary>
     ///<remarks>
     /// Context Note:
     /// This is called internally by Self within its own context.
     ///</remarks>
-    procedure CallSynchronize(const pMethod:TThreadMethod);
+    procedure CallQueue(const MethodToCall:TThreadMethod);
 
 
     ///<summary>
@@ -301,7 +301,7 @@ type
     /// Optional. This is called by Self within its own context and only by
     /// descendants.
     ///</remarks>
-    procedure ReportProgress(const pAnyProgressText:String);
+    procedure ReportProgress(const AnyProgressText:String);
 
     ///<summary>
     /// The protected method, Sleep, is a replacement for windows.sleep
@@ -313,7 +313,7 @@ type
     /// Optional. This is called by Self within its own context and only by
     /// descendants.
     ///</remarks>
-    procedure Sleep(const pSleepTimeMS:Integer);
+    procedure Sleep(const SleepTimeMS:Integer);
 
     ///<summary>
     /// The protected property, ExecOption, is available for descendants to
@@ -373,7 +373,7 @@ type
     ///
     /// Note: By default, the descendant's 'Run' method is continuously executed
     /// (BeforeRun, Run, AfterRun is performed in a loop) This can be overriden
-    /// by overriding the pExecOption default parameter
+    /// by overriding the ExecOption default parameter
     ///</summary>
     ///<remarks>
     /// Context Note:
@@ -381,7 +381,7 @@ type
     /// OR during a Destroy if the thread is released but never started (Which
     /// temporarily starts the thread in order to properly shut it down.)
     ///</remarks>
-    function Start(const pExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
+    function Start(const aExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
 
     ///<summary>
     /// The public method, Stop, is a thread-safe way to deactivate a running
@@ -430,7 +430,7 @@ type
     /// be also be used by descendants
     /// event)
     ///</remarks>
-    function WaitForHandle(const pHandle:THandle):Boolean;
+    function WaitForHandle(const Handle:THandle):Boolean;
 
     ///<summary>
     /// The public event property, OnException, is executed when an error is
@@ -648,12 +648,12 @@ begin
 end;
 
 
-function TiaThread.Start(const pExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
+function TiaThread.Start(const aExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
 begin
   if fStateChangeLock.TryEnter then
   begin
     try
-      ExecOption := pExecOption;
+      ExecOption := aExecOption;
 
       Result := CanBeStarted;
       if Result then
@@ -711,11 +711,11 @@ begin
 end;
 
 
-procedure TiaThread.SuspendThread(const pReason:TiaThreadState);
+procedure TiaThread.SuspendThread(const SuspendReason:TiaThreadState);
 begin
   fStateChangeLock.Enter;
   try
-    fThreadState := pReason; //will auto-suspend thread in Exec
+    fThreadState := SuspendReason; //will auto-suspend thread in Exec
 
     //If we are sleeping in the RUN loop, wake up and check stopped
     //which is why you should use self.Sleep(x) instead of windows.sleep(x)
@@ -741,7 +741,7 @@ procedure TiaThread.DoOnRunCompletion;
 begin
   if Assigned(fOnRunCompletion) then
   begin
-    CallSynchronize(Sync_CallOnRunCompletion);
+    CallQueue(Sync_CallOnRunCompletion);
   end;
 end;
 
@@ -759,7 +759,7 @@ procedure TiaThread.DoOnException;
 begin
   if Assigned(fOnException) then
   begin
-    CallSynchronize(Sync_CallOnException);
+    CallQueue(Sync_CallOnException);
   end;
   fStateChangeLock.Enter;
   try
@@ -796,9 +796,9 @@ begin
 end;
 
 
-procedure TiaThread.SetExecOption(const pVal:TiaThreadExecOption);
+procedure TiaThread.SetExecOption(const NewValue:TiaThreadExecOption);
 begin
-  System.AtomicExchange(fExecOptionInt, Ord(pVal));
+  System.AtomicExchange(fExecOptionInt, Ord(NewValue));
 end;
 
 
@@ -829,18 +829,18 @@ begin
 end;
 
 
-procedure TiaThread.Sleep(const pSleepTimeMS:Integer);
+procedure TiaThread.Sleep(const SleepTimeMS:Integer);
 begin
   if not Terminated then
   begin
-    fAbortableSleepEvent.WaitFor(pSleepTimeMS);
+    fAbortableSleepEvent.WaitFor(SleepTimeMS);
   end;
 end;
 
 
-procedure TiaThread.CallSynchronize(const pMethod:TThreadMethod);
+procedure TiaThread.CallQueue(const MethodToCall:TThreadMethod);
 begin
-  Queue(pMethod);  //Unlike Synchronize, execution of the current thread is allowed to continue. The main thread will eventually process all queued methods.
+  Queue(MethodToCall);  //Unlike Synchronize, execution of the current thread is allowed to continue. The main thread will eventually process all queued methods.
 end;
 
 
@@ -865,14 +865,14 @@ begin
 end;
 
 
-procedure TiaThread.ReportProgress(const pAnyProgressText:String);
+procedure TiaThread.ReportProgress(const AnyProgressText:String);
 begin
   if Assigned(fOnReportProgress) then
   begin
     fOnProgressLock.Enter;   //we are currently in the worker thread - manage access to fProgressReportsToSend with main thread that may be dequeing a previous progress report right now
     try
-      fProgressReportsToSend := fProgressReportsToSend + [pAnyProgressText];
-      CallSynchronize(Sync_CallOnReportProgress);
+      fProgressReportsToSend := fProgressReportsToSend + [AnyProgressText];
+      CallQueue(Sync_CallOnReportProgress);
     finally
       fOnProgressLock.Leave;
     end;
@@ -880,7 +880,7 @@ begin
 end;
 
 
-function TiaThread.WaitForHandle(const pHandle:THandle):Boolean;
+function TiaThread.WaitForHandle(const Handle:THandle):Boolean;
 const
   WaitAllOption = False;
   IterateTimeOutMilliseconds = 200;
@@ -889,7 +889,7 @@ var
   vWaitForResponse:DWord;
 begin
   Result := False;
-  vWaitForEventHandles[0] := pHandle;   //initially for: fResumeSignal.Handle;
+  vWaitForEventHandles[0] := Handle;   //initially for: fResumeSignal.Handle;
   vWaitForEventHandles[1] := fAbortableSleepEvent.Handle;
 
   while not Terminated do
