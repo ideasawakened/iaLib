@@ -19,7 +19,7 @@ As of January 2016, latest version available online at:
   https://github.com/darianmiller/dxLib
 *)
 
-unit dxLib_Thread;
+unit iaRTL.Thread;
 
 interface
 {$I dxLib.inc}
