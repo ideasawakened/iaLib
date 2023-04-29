@@ -28,13 +28,11 @@ uses
   {$IFDEF IA_UnitScopeNames}
   System.SysUtils,
   System.Classes,
-  System.SyncObjs,
-  Winapi.Windows;
+  System.SyncObjs;
   {$ELSE}
   SysUtils,
   Classes,
-  SyncObjs,
-  Windows;
+  SyncObjs;
   {$ENDIF}
 
 
@@ -511,9 +509,17 @@ implementation
 
 uses
   {$IFDEF IA_UnitScopeNames}
-  WinApi.ActiveX;
+  {$IFDEF MSWINDOWS}
+  WinApi.ActiveX,
+  WinApi.Windows,
+  {$ENDIF}
+  System.Types;
   {$ELSE}
-  ActiveX;
+  {$IFDEF MSWINDOWS}
+  ActiveX,
+  Windows,
+  {$ENDIF}
+  Types;
   {$ENDIF}
 
 
@@ -815,13 +821,13 @@ end;
 
 function TiaThread.GetExecOption():TiaThreadExecOption;
 begin
-  Result := TiaThreadExecOption(fExecOptionInt);
+  Result := TiaThreadExecOption(System.AtomicCmpExchange(fExecOptionInt, 0, 0));
 end;
 
 
 procedure TiaThread.SetExecOption(const pVal:TiaThreadExecOption);
 begin
-  InterlockedExchange(fExecOptionInt, Ord(pVal));
+  System.AtomicExchange(fExecOptionInt, Ord(pVal));
 end;
 
 
@@ -900,7 +906,11 @@ begin
 
   while not Terminated do
   begin
+    {$IFDEF MSWINDOWS}
     vWaitForResponse := WaitForMultipleObjects(2, @vWaitForEventHandles[0], WaitAllOption, IterateTimeOutMilliseconds);
+    {$ELSE}
+      {$Message TiaThread not yet cross-platform...}
+    {$ENDIF}
     case vWaitForResponse of
     WAIT_TIMEOUT:
       begin
