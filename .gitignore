@@ -26,6 +26,9 @@
 #*.obj
 #
 
+# Typically Delphi-generated - if needed, add manually
+*.res
+
 # Delphi compiler-generated binaries (safe to delete)
 *.exe
 *.dll
@@ -67,3 +70,13 @@ __recovery/
 
 # Boss dependency manager vendor folder https://github.com/HashLoad/boss
 modules/
+
+# Common exclusions
+*.bak
+*.temp
+*.tmp
+[Tt]humbs.db
+
+# Platform output folders
+Win32
+Win64
