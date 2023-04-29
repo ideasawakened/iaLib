@@ -41,12 +41,12 @@ uses
 
 type
 
-  TdxThread = class;
-  TdxNotifyThreadEvent = procedure(const pThread:TdxThread) of object;
-  TdxExceptionEvent = procedure(const pSender:TObject; const pException:Exception) of object;
+  TiaThread = class;
+  TiaNotifyThreadEvent = procedure(const pThread:TiaThread) of object;
+  TiaExceptionEvent = procedure(const pSender:TObject; const pException:Exception) of object;
 
 
-  TdxThreadState = (tsActive,
+  TiaThreadState = (tsActive,
                     tsSuspended_NotYetStarted,
                     tsSuspended_ManuallyStopped,
                     tsSuspended_RunOnceCompleted,
@@ -55,7 +55,7 @@ type
                     tsTerminated,
                     tsAbortedDueToException);
 
-  TdxThreadExecOption = (teRepeatRun,
+  TiaThreadExecOption = (teRepeatRun,
                          teRunThenSuspend,
                          teRunThenFree);
 
@@ -72,9 +72,9 @@ type
   ///   3):Instead of using Windows.Sleep(), utlize the thread's Sleep() method so it can be aborted on thread shutdown
   ///</remarks>
   {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-  TdxThread = class(TThread)
+  TiaThread = class(TThread)
   private
-    fThreadState:TdxThreadState;
+    fThreadState:TiaThreadState;
     fStateChangeLock:TdxProcessResourceLock;
 
     fExecOptionInt:Integer;
@@ -82,8 +82,8 @@ type
 
     fProgressTextToReport:String;
     fTrappedException:Exception;
-    fOnException:TdxExceptionEvent;
-    fOnRunCompletion:TdxNotifyThreadEvent;
+    fOnException:TiaExceptionEvent;
+    fOnRunCompletion:TiaNotifyThreadEvent;
     fOnReportProgress:TGetStrProc;
 
     fAbortableSleepEvent:TEvent;
@@ -101,7 +101,7 @@ type
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    function GetThreadState():TdxThreadState;
+    function GetThreadState():TiaThreadState;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private getter method, GetExecOption, is used to read the current
@@ -112,7 +112,7 @@ type
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    function GetExecOption():TdxThreadExecOption;
+    function GetExecOption():TiaThreadExecOption;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private setter method, SetExecOption, is used to write the current
@@ -123,7 +123,7 @@ type
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure SetExecOption(const pVal:TdxThreadExecOption);
+    procedure SetExecOption(const pVal:TiaThreadExecOption);
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, SuspendThread, is use to deactivate an active
@@ -134,7 +134,7 @@ type
     /// This is executed by outside threads OR by Self within its own context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    procedure SuspendThread(const pReason:TdxThreadState);
+    procedure SuspendThread(const pReason:TiaThreadState);
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The private method, Sync_CallOnReportProgress, is meant to be protected
@@ -215,7 +215,7 @@ type
     /// This is referenced by outside threads OR by Self within its own context
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    property ThreadState:TdxThreadState read GetThreadState;
+    property ThreadState:TiaThreadState read GetThreadState;
   protected
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
@@ -258,7 +258,7 @@ type
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The virtual Abstract protected method, Run, should be overriden by descendant
-    /// classes to perform work. The option (TdxThreadExecOption) passed to
+    /// classes to perform work. The option (TiaThreadExecOption) passed to
     /// Start controls how Run is executed.
     ///</summary>
     ///<remarks>
@@ -354,7 +354,7 @@ type
     /// context - which is the reason for InterlockedExchange in SetExecOption
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    property ExecOption:TdxThreadExecOption read GetExecOption write SetExecOption;
+    property ExecOption:TiaThreadExecOption read GetExecOption write SetExecOption;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The protected property, RequireCoinitialize, is available for
@@ -372,7 +372,7 @@ type
   public
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
-    /// Public constructor for TdxThread, a descendant of TThread.
+    /// Public constructor for TiaThread, a descendant of TThread.
     /// Note: This constructor differs from TThread as all of these threads are
     /// started suspended by default.
     ///</summary>
@@ -384,7 +384,7 @@ type
     constructor Create();
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
-    /// Public destructor for TdxThread, a descendant of TThread.
+    /// Public destructor for TiaThread, a descendant of TThread.
     /// Note: This will automatically terminate/waitfor thread as needed
     ///</summary>
     ///<remarks>
@@ -398,7 +398,7 @@ type
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The public method, Start, is used to activate the thread to begin work.
-    /// All TdxThreads are created in suspended mode and must be activated to do
+    /// All TiaThreads are created in suspended mode and must be activated to do
     /// any work.
     ///
     /// Note: By default, the descendant's 'Run' method is continuously executed
@@ -412,7 +412,7 @@ type
     /// temporarily starts the thread in order to properly shut it down.)
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    function Start(const pExecOption:TdxThreadExecOption=teRepeatRun):Boolean;
+    function Start(const pExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The public method, Stop, is a thread-safe way to deactivate a running
@@ -479,7 +479,7 @@ type
     /// referenced by Self within its own context in a non-threadsafe manner.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    property OnException:TdxExceptionEvent read fOnException write fOnException;
+    property OnException:TiaExceptionEvent read fOnException write fOnException;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The public event property, OnRunCompletion, is executed as soon as the
@@ -492,7 +492,7 @@ type
     /// referenced by Self within its own context in a non-threadsafe manner.
     ///</remarks>
     {$IFDEF NODEF}{$ENDREGION}{$ENDIF}
-    property OnRunCompletion:TdxNotifyThreadEvent read fOnRunCompletion write fOnRunCompletion;
+    property OnRunCompletion:TiaNotifyThreadEvent read fOnRunCompletion write fOnRunCompletion;
     {$IFDEF NODEF}{$REGION 'Documentation'}{$ENDIF}
     ///<summary>
     /// The public event property, OnReportProgress, is executed by descendant
@@ -520,7 +520,7 @@ uses
   dxLib_WinApi;
 
 
-constructor TdxThread.Create();
+constructor TiaThread.Create();
 begin
   inherited Create(True); //We always create suspended, user must always call Start()
 
@@ -531,7 +531,7 @@ begin
 end;
 
 
-destructor TdxThread.Destroy();
+destructor TiaThread.Destroy();
 begin
   if fThreadState = tsSuspended_NotYetStarted then
   begin
@@ -563,7 +563,7 @@ begin
 end;
 
 
-procedure TdxThread.Execute();
+procedure TiaThread.Execute();
 begin
   try //except
   
@@ -637,7 +637,7 @@ begin
 end;
 
 
-procedure TdxThread.WaitForResume();
+procedure TiaThread.WaitForResume();
 begin
   fStateChangeLock.Lock();
   try
@@ -660,7 +660,7 @@ begin
 end;
 
 
-procedure TdxThread.ThreadHasResumed();
+procedure TiaThread.ThreadHasResumed();
 begin
   //If we resumed a stopped thread, then a reset event is needed as it
   //was set to trigger out of any pending sleeps to pause the thread
@@ -669,32 +669,32 @@ begin
 end;
 
 
-function TdxThread.ExternalRequestToStop:Boolean;
+function TiaThread.ExternalRequestToStop:Boolean;
 begin
   //Intended to be overriden - for descendant's use as needed
   Result := False;
 end;
 
 
-procedure TdxThread.BeforeRun();
+procedure TiaThread.BeforeRun();
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
 
 
-procedure TdxThread.BetweenRuns();
+procedure TiaThread.BetweenRuns();
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
 
 
-procedure TdxThread.AfterRun();
+procedure TiaThread.AfterRun();
 begin
   //Intended to be overriden - for descendant's use as needed
 end;
 
 
-function TdxThread.Start(const pExecOption:TdxThreadExecOption=teRepeatRun):Boolean;
+function TiaThread.Start(const pExecOption:TiaThreadExecOption=teRepeatRun):Boolean;
 begin
   if fStateChangeLock.TryLock() then
   begin
@@ -733,7 +733,7 @@ begin
 end;
 
 
-function TdxThread.Stop():Boolean;
+function TiaThread.Stop():Boolean;
 begin
   if ExecOption <> teRunThenFree then
   begin
@@ -761,7 +761,7 @@ begin
 end;
 
 
-procedure TdxThread.SuspendThread(const pReason:TdxThreadState);
+procedure TiaThread.SuspendThread(const pReason:TiaThreadState);
 begin
   fStateChangeLock.Lock();
   try
@@ -778,7 +778,7 @@ begin
 end;
 
 
-procedure TdxThread.Sync_CallOnRunCompletion();
+procedure TiaThread.Sync_CallOnRunCompletion();
 begin
   if not Terminated then
   begin
@@ -787,7 +787,7 @@ begin
 end;
 
 
-procedure TdxThread.DoOnRunCompletion();
+procedure TiaThread.DoOnRunCompletion();
 begin
   if Assigned(fOnRunCompletion) then
   begin
@@ -796,7 +796,7 @@ begin
 end;
 
 
-procedure TdxThread.Sync_CallOnException();
+procedure TiaThread.Sync_CallOnException();
 begin
   if not Terminated then
   begin
@@ -805,7 +805,7 @@ begin
 end;
 
 
-procedure TdxThread.DoOnException();
+procedure TiaThread.DoOnException();
 begin
   if Assigned(fOnException) then
   begin
@@ -821,7 +821,7 @@ begin
 end;
 
 
-function TdxThread.GetThreadState():TdxThreadState;
+function TiaThread.GetThreadState():TiaThreadState;
 begin
   fStateChangeLock.Lock();
   try
@@ -840,19 +840,19 @@ begin
 end;
 
 
-function TdxThread.GetExecOption():TdxThreadExecOption;
+function TiaThread.GetExecOption():TiaThreadExecOption;
 begin
-  Result := TdxThreadExecOption(fExecOptionInt);
+  Result := TiaThreadExecOption(fExecOptionInt);
 end;
 
 
-procedure TdxThread.SetExecOption(const pVal:TdxThreadExecOption);
+procedure TiaThread.SetExecOption(const pVal:TiaThreadExecOption);
 begin
   InterlockedExchange(fExecOptionInt, Ord(pVal));
 end;
 
 
-function TdxThread.CanBeStarted():Boolean;
+function TiaThread.CanBeStarted():Boolean;
 begin
   if Assigned(fAwakeToFreeEvent) then
   begin
@@ -881,13 +881,13 @@ begin
 end;
 
 
-function TdxThread.ThreadIsActive():Boolean;
+function TiaThread.ThreadIsActive():Boolean;
 begin
   Result := (not Terminated) and (ThreadState = tsActive);
 end;
 
 
-procedure TdxThread.Sleep(const pSleepTimeMS:Integer);
+procedure TiaThread.Sleep(const pSleepTimeMS:Integer);
 begin
   if not Terminated then
   begin
@@ -896,13 +896,13 @@ begin
 end;
 
 
-procedure TdxThread.CallSynchronize(const pMethod:TThreadMethod);
+procedure TiaThread.CallSynchronize(const pMethod:TThreadMethod);
 begin
   Synchronize(pMethod);
 end;
 
 
-procedure TdxThread.Sync_CallOnReportProgress();
+procedure TiaThread.Sync_CallOnReportProgress();
 begin
   if not Terminated then
   begin
@@ -911,7 +911,7 @@ begin
 end;
 
 
-procedure TdxThread.ReportProgress(const pAnyProgressText:String);
+procedure TiaThread.ReportProgress(const pAnyProgressText:String);
 begin
   if Assigned(fOnReportProgress) then
   begin
@@ -921,7 +921,7 @@ begin
 end;
 
 
-function TdxThread.WaitForHandle(const pHandle:THandle):Boolean;
+function TiaThread.WaitForHandle(const pHandle:THandle):Boolean;
 const
   WaitAllOption = False;
   IterateTimeOutMilliseconds = 200;
