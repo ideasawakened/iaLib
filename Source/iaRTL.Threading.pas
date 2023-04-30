@@ -35,7 +35,13 @@ type
   TiaExceptionEvent = procedure(const pSender:TObject; const pException:Exception) of object;
 
 
-  TiaThreadState = (tsActive, tsSuspended_NotYetStarted, tsSuspended_ManuallyStopped, tsSuspended_RunOnceCompleted, tsSuspendPending_StopRequestReceived, tsSuspendPending_RunOnceComplete, tsTerminated, tsAbortedDueToException);
+  TiaThreadState = (tsActive,
+                    tsSuspended_NotYetStarted,
+                    tsSuspended_ManuallyStopped,
+                    tsSuspended_RunOnceCompleted,
+                    tsSuspendPending_StopRequestReceived,
+                    tsSuspendPending_RunOnceComplete,
+                    tsTerminated);
 
   TiaThreadExecOption = (teRepeatRun, teRunThenSuspend, teRunThenFree);
 
@@ -60,8 +66,6 @@ type
     {$IFDEF MSWINDOWS}
     fRequireCoinitialize:Boolean;
     {$ENDIF}
-    fTrappedException:Exception;
-    fOnException:TiaExceptionEvent;
     fOnRunCompletion:TiaNotifyThreadEvent;
     fOnReportProgress:TGetStrProc;
 
@@ -136,17 +140,6 @@ type
     procedure Sync_CallOnRunCompletion;
 
     /// <summary>
-    /// The private method, Sync_CallOnException, is meant to be protected
-    /// within a Synchronize call to safely execute the optional OnException
-    /// event within the main thread's context
-    /// </summary>
-    /// <remarks>
-    /// Context Note:
-    /// This is executed within the main thread's context
-    /// </remarks>
-    procedure Sync_CallOnException;
-
-    /// <summary>
     /// The private method, DoOnRunCompletion, sets up the call to properly
     /// execute the OnRunCompletion event via Syncrhonize.
     /// </summary>
@@ -155,16 +148,6 @@ type
     /// This is called internally by Self within its own context.
     /// </remarks>
     procedure DoOnRunCompletion;
-
-    /// <summary>
-    /// The private method, DoOnException, sets up the call to properly
-    /// execute the OnException event via Syncrhonize.
-    /// </summary>
-    /// <remarks>
-    /// Context Note:
-    /// This is called internally by Self within its own context.
-    /// </remarks>
-    procedure DoOnException;
 
     /// <summary>
     /// The private method, CallQueue, calls the TThread.Queue
@@ -426,18 +409,6 @@ type
     function WaitForHandle(const Handle:THandle):Boolean;
 
     /// <summary>
-    /// The public event property, OnException, is executed when an error is
-    /// trapped within the thread's Run loop
-    /// </summary>
-    /// <remarks>
-    /// Context Note:
-    /// This is executed within the main thread's context via Synchronize.
-    /// The property should only be set while the thread is inactive as it is
-    /// referenced by Self within its own context in a non-threadsafe manner.
-    /// </remarks>
-    property OnException:TiaExceptionEvent read fOnException write fOnException;
-
-    /// <summary>
     /// The public event property, OnRunCompletion, is executed as soon as the
     /// Run method exits
     /// </summary>
@@ -507,79 +478,70 @@ end;
 
 procedure TiaThread.Execute;
 begin
-  try // except
-
-    if Length(fThreadNameForDebugger) > 0 then
+  if Length(fThreadNameForDebugger) > 0 then
+  begin
+    if fThreadNameForDebugger <> fLastThreadNameForDebugger then // NameThreadForDebugging only called as needed
     begin
-      if fThreadNameForDebugger <> fLastThreadNameForDebugger then // NameThreadForDebugging only called as needed
-      begin
-        fLastThreadNameForDebugger := fThreadNameForDebugger;
-        NameThreadForDebugging(fThreadNameForDebugger);
-      end;
-    end;
-
-    while not Terminated do
-    begin
-      {$IFDEF MSWINDOWS}
-      if fRequireCoinitialize then
-      begin
-        CoInitialize(nil);
-      end;
-      try
-        {$ENDIF}
-        ThreadHasResumed;
-        BeforeRun;
-        try
-          while ThreadIsActive do // check for stop, externalstop, terminate
-          begin
-            Run; // descendant's code
-            DoOnRunCompletion;
-
-            case ExecOption of
-              teRepeatRun:
-                begin
-                  BetweenRuns;
-                  // then loop
-                end;
-              teRunThenSuspend:
-                begin
-                  SuspendThread(tsSuspendPending_RunOnceComplete);
-                  Break;
-                end;
-              teRunThenFree:
-                begin
-                  FreeOnTerminate := True;
-                  Terminate;
-                  Break;
-                end;
-            end;
-          end; // while ThreadIsActive()
-        finally
-          AfterRun;
-        end;
-        {$IFDEF MSWINDOWS}
-      finally
-        if fRequireCoinitialize then
-        begin
-          // ensure this is called if thread is to be suspended
-          CoUnInitialize;
-        end;
-      end;
-      {$ENDIF}
-      // Thread entering wait state
-      WaitForResume;
-      // Note: Only two reasons to wake up a suspended thread:
-      // 1: We are going to terminate it
-      // 2: we want it to restart doing work
-    end; // while not Terminated
-
-  except
-    on E:Exception do
-    begin
-      fTrappedException := E;
-      DoOnException;
+      fLastThreadNameForDebugger := fThreadNameForDebugger;
+      NameThreadForDebugging(fThreadNameForDebugger);
     end;
   end;
+
+  while not Terminated do
+  begin
+    {$IFDEF MSWINDOWS}
+    if fRequireCoinitialize then
+    begin
+      CoInitialize(nil);
+    end;
+    try
+      {$ENDIF}
+      ThreadHasResumed;
+      BeforeRun;
+      try
+        while ThreadIsActive do // check for stop, externalstop, terminate
+        begin
+          Run; // descendant's code
+          DoOnRunCompletion;
+
+          case ExecOption of
+            teRepeatRun:
+              begin
+                BetweenRuns;
+                // then loop
+              end;
+            teRunThenSuspend:
+              begin
+                SuspendThread(tsSuspendPending_RunOnceComplete);
+                Break;
+              end;
+            teRunThenFree:
+              begin
+                FreeOnTerminate := True;
+                Terminate;
+                Break;
+              end;
+          end;
+        end; // while ThreadIsActive()
+      finally
+        AfterRun;
+      end;
+      {$IFDEF MSWINDOWS}
+    finally
+      if fRequireCoinitialize then
+      begin
+        // ensure this is called if thread is to be suspended
+        CoUnInitialize;
+      end;
+    end;
+    {$ENDIF}
+    // Thread entering wait state
+    WaitForResume;
+    // Note: Only two reasons to wake up a suspended thread:
+    // 1: We are going to terminate it
+    // 2: we want it to restart doing work
+  end; // while not Terminated
+
 end;
 
 
@@ -735,31 +697,6 @@ begin
   begin
     CallQueue(Sync_CallOnRunCompletion);
   end;
-end;
-
-
-procedure TiaThread.Sync_CallOnException;
-begin
-  if not Terminated then
-  begin
-    fOnException(Self, fTrappedException);
-  end;
-end;
-
-
-procedure TiaThread.DoOnException;
-begin
-  if Assigned(fOnException) then
-  begin
-    CallQueue(Sync_CallOnException);
-  end;
-  fStateChangeLock.Enter;
-  try
-    fThreadState := tsAbortedDueToException;
-  finally
-    fStateChangeLock.Leave;
-  end;
-  fTrappedException := nil;
 end;
 
 

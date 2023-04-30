@@ -38,8 +38,6 @@ type
     labTimerStarted:TLabel;
     panLog:TPanel;
     memLog:TMemo;
-    Label7:TLabel;
-    labExceptionsCaught:TLabel;
     procedure butStartTimerClick(Sender:TObject);
     procedure butStopTimerClick(Sender:TObject);
     procedure FormCreate(Sender:TObject);
@@ -55,11 +53,9 @@ type
     fCountStart:Int64;
     fCountIsActive:Int64;
     fCountCanStart:Int64;
-    fCountExceptions:Int64;
     fInTimer:Boolean;
     fTestCodeSite:Boolean;
     procedure LogProgress(const LogEntry:string);
-    procedure LogException(const aSender:TObject; const aException:Exception);
     procedure DoCreateThread;
     procedure DoFree;
     procedure DoStop;
@@ -228,7 +224,6 @@ begin
   Logger.SetCurrentLogLevel(TiaLogLevel.All);
 
   WorkerThread := TSimpleExample.Create('Worker' + fCountCreate.ToString, Logger);
-  WorkerThread.OnException := LogException;
   WorkerThread.PauseBetweenWorkMS := Random(10000);
   if Odd(Random(100)) then
   begin
@@ -294,14 +289,6 @@ begin
   WorkerThread.CanBeStarted;
   Inc(fCountCanStart);
   labCanStartChecks.Caption := IntToStr(fCountCanStart);
-end;
-
-
-procedure TfrmThreadStateTest.LogException(const aSender:TObject; const aException:Exception);
-begin
-  LogProgress('Exception caught: ' + aException.Message);
-  Inc(fCountExceptions);
-  labExceptionsCaught.Caption := IntToStr(fCountExceptions);
 end;
 
 

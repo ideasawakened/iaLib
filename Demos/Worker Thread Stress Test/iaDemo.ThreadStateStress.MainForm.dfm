@@ -45,10 +45,9 @@ object frmThreadStateTest: TfrmThreadStateTest
     Left = 0
     Top = 41
     Width = 635
-    Height = 165
+    Height = 144
     Align = alTop
     TabOrder = 1
-    ExplicitWidth = 631
     object Label1: TLabel
       Left = 24
       Top = 16
@@ -147,35 +146,22 @@ object frmThreadStateTest: TfrmThreadStateTest
       Height = 13
       Caption = 'n/a'
     end
-    object Label7: TLabel
-      Left = 24
-      Top = 140
-      Width = 90
-      Height = 13
-      Caption = 'Exceptions Caught'
-    end
-    object labExceptionsCaught: TLabel
-      Left = 129
-      Top = 140
-      Width = 6
-      Height = 13
-      Caption = '0'
-    end
   end
   object panLog: TPanel
     Left = 0
-    Top = 206
+    Top = 185
     Width = 635
-    Height = 301
+    Height = 322
     Align = alClient
     TabOrder = 2
+    ExplicitTop = 206
     ExplicitWidth = 631
     ExplicitHeight = 300
     object memLog: TMemo
       Left = 1
       Top = 1
       Width = 633
-      Height = 299
+      Height = 320
       Align = alClient
       ScrollBars = ssBoth
       TabOrder = 0
