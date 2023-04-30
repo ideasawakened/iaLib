@@ -284,7 +284,7 @@ type
     /// Optional. This is called by Self within its own context and only by
     /// descendants.
     /// </remarks>
-    procedure Sleep(const SleepTimeMS:Integer);
+    function Sleep(const SleepTimeMS:Integer):Boolean;
 
     /// <summary>
     /// The protected property, ExecOption, is available for descendants to
@@ -755,11 +755,11 @@ begin
 end;
 
 
-procedure TiaThread.Sleep(const SleepTimeMS:Integer);
+function TiaThread.Sleep(const SleepTimeMS:Integer):Boolean;
 begin
   if not Terminated then
   begin
-    fAbortableSleepEvent.WaitFor(SleepTimeMS);
+    Result := (fAbortableSleepEvent.WaitFor(SleepTimeMS) = TWaitResult.wrTimeout);
   end;
 end;
 

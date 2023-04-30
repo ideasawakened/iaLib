@@ -107,7 +107,10 @@ begin
     if SleepAfterCheckMS > 0 then
     begin
       Log(Format('Sleeping worker thread for %dms', [SleepAfterCheckMS]), defInternalLogEntryType);
-      Self.Sleep(SleepAfterCheckMS); // abortable sleep
+      if not Self.Sleep(SleepAfterCheckMS) then // abortable sleep
+      begin
+        Result := True;
+      end;
     end;
   end
   else

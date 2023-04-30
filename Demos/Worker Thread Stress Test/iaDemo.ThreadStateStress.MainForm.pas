@@ -137,8 +137,7 @@ procedure TfrmThreadStateTest.butStopTimerClick(Sender:TObject);
 begin
   fActionLock.Enter;
   try
-    memLog.Lines.Clear;
-    LogProgress('Stop clicked');
+    LogProgress(Format('Stop clicked [%d]', [GetTickCount]));
     tmrThreadEvent.Enabled := False;
     TakeAction(True);
     labTimerStarted.Caption := labTimerStarted.Caption + ' - ' + FormatDateTime('mm/dd/yyyy hh:nn:ss', Now);
@@ -182,7 +181,6 @@ var
   ActionToTake:Integer;
   CurrentWorkerThreadCount:Integer;
   Worker:TSimpleExample;
-  i:Integer;
 begin
   CurrentWorkerThreadCount := Length(fWorkerThreads);
   if ForceAllStop then
@@ -191,13 +189,13 @@ begin
       Exit;
     for Worker in fWorkerThreads do
     begin
-      LogProgress('Stopping ' + Worker.ThreadNameForDebugger);
+      LogProgress(Format('Stopping %s [%d]', [Worker.ThreadNameForDebugger, GetTickCount]));
       Worker.Stop;
       Inc(fCountStop);
     end;
     for Worker in fWorkerThreads do
     begin
-      LogProgress('Freeing ' + Worker.ThreadNameForDebugger);
+      LogProgress(Format('Freeing %s [%d]', [Worker.ThreadNameForDebugger, GetTickCount]));
       Worker.Free;
       Inc(fCountFree);
     end;
@@ -237,23 +235,20 @@ var
   WorkerThread:TSimpleExample;
   Logger:ILogger;
 begin
-//  if fTestCodeSite and Odd(Random(100)) then
-//  begin
+  if fTestCodeSite and Odd(Random(100)) then
+  begin
     Logger := TiaCodeSiteLogger.Create('Viewer');
-//  end
-//  else
-//  begin
-//    Logger := TiaWindowsDebugLogging.Create;
-//  end;
+  end
+  else
+  begin
+    Logger := TiaWindowsDebugLogging.Create;
+  end;
   Logger.SetLoggingIsEnabled(True);
   Logger.SetCurrentLogLevel(TiaLogLevel.All);
 
   WorkerThread := TSimpleExample.Create('Worker' + fCountCreate.ToString, Logger);
-  WorkerThread.PauseBetweenWorkMS := Random(10000);
-  if Odd(Random(100)) then
-  begin
-    WorkerThread.OnReportProgress := LogProgress;
-  end;
+  WorkerThread.PauseBetweenWorkMS := Random(1000);
+  WorkerThread.OnReportProgress := LogProgress;
 
   fWorkerThreads := fWorkerThreads + [WorkerThread];
   Inc(fCountCreate);
