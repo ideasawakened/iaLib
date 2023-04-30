@@ -7,6 +7,7 @@ uses
   Winapi.Messages,
   System.SysUtils,
   System.Classes,
+  System.SyncObjs,
   Vcl.Graphics,
   Vcl.Controls,
   Vcl.Forms,
@@ -53,8 +54,8 @@ type
     fCountStart:Int64;
     fCountIsActive:Int64;
     fCountCanStart:Int64;
-    fInTimer:Boolean;
     fTestCodeSite:Boolean;
+    fClosed:Boolean;
     procedure LogProgress(const LogEntry:string);
     procedure DoCreateThread;
     procedure DoFree;
@@ -67,6 +68,10 @@ type
 
 var
   frmThreadStateTest:TfrmThreadStateTest;
+  fActionLock:TCriticalSection;
+
+const
+  MAX_THREADS = 150;
 
 implementation
 
@@ -90,11 +95,15 @@ procedure TfrmThreadStateTest.FormDestroy(Sender:TObject);
 var
   Worker:TSimpleExample;
 begin
-  fInTimer := True;
-  tmrThreadEvent.Enabled := False;
-  for Worker in fWorkerThreads do
-  begin
-    Worker.Free;
+  fActionLock.Enter;
+  try
+    tmrThreadEvent.Enabled := False;
+    for Worker in fWorkerThreads do
+    begin
+      Worker.Free;
+    end;
+  finally
+    fActionLock.Leave;
   end;
 end;
 
@@ -102,37 +111,47 @@ end;
 procedure TfrmThreadStateTest.FormCloseQuery(Sender:TObject; var CanClose:Boolean);
 begin
   tmrThreadEvent.Enabled := False;
+  fClosed := True;
 end;
 
 
 procedure TfrmThreadStateTest.butStartTimerClick(Sender:TObject);
 begin
-  if not tmrThreadEvent.Enabled then
-  begin
-    labTimerActiveStatus.Caption := 'Timer Active';
-    labTimerStarted.Caption := FormatDateTime('mm/dd/yyyy hh:nn:ss', Now);
-    tmrThreadEvent.Enabled := True;
+  fActionLock.Enter;
+  try
+    memLog.Lines.Clear;
+    LogProgress('Start clicked');
+    if not tmrThreadEvent.Enabled then
+    begin
+      labTimerActiveStatus.Caption := 'Timer Active';
+      labTimerStarted.Caption := FormatDateTime('mm/dd/yyyy hh:nn:ss', Now);
+      tmrThreadEvent.Enabled := True;
+    end;
+  finally
+    fActionLock.Leave;
   end;
 end;
 
 
 procedure TfrmThreadStateTest.butStopTimerClick(Sender:TObject);
 begin
-  if (not fInTimer) and tmrThreadEvent.Enabled then
-  begin
-    fInTimer := True;
+  fActionLock.Enter;
+  try
+    memLog.Lines.Clear;
+    LogProgress('Stop clicked');
     tmrThreadEvent.Enabled := False;
     TakeAction(True);
     labTimerStarted.Caption := labTimerStarted.Caption + ' - ' + FormatDateTime('mm/dd/yyyy hh:nn:ss', Now);
     labTimerActiveStatus.Caption := 'Timer Not Active';
-    fInTimer := False;
+  finally
+    fActionLock.Leave;
   end;
 end;
 
 
 procedure TfrmThreadStateTest.LogProgress(const LogEntry:string);
 begin
-  if memLog.Lines.Count > 5000 then
+  if memLog.Lines.Count > (MAX_THREADS*3) then
   begin
     memLog.Lines.Clear;
   end;
@@ -143,22 +162,22 @@ end;
 
 procedure TfrmThreadStateTest.tmrThreadEventTimer(Sender:TObject);
 begin
-  if (not fInTimer) and (not Application.Terminated) then
+  if (not fClosed) and fActionLock.TryEnter then
   begin
-    tmrThreadEvent.Enabled := False;
-    fInTimer := True;
-    tmrThreadEvent.Interval := Trunc(Random(50)) + 1;
-    TakeAction;
-    fInTimer := False;
-    tmrThreadEvent.Enabled := True;
+    try
+      tmrThreadEvent.Enabled := False;
+      tmrThreadEvent.Interval := Trunc(Random(50)) + 1;
+      TakeAction;
+      tmrThreadEvent.Enabled := True;
+    finally
+      fActionLock.Leave;
+    end;
   end;
 end;
 
 
 // Validate that the methods can be externally called in any order, during any current state of the thread
 procedure TfrmThreadStateTest.TakeAction(const ForceAllStop:Boolean = False);
-const
-  MAX_THREADS = 300;
 var
   ActionToTake:Integer;
   CurrentWorkerThreadCount:Integer;
@@ -170,9 +189,15 @@ begin
   begin
     if CurrentWorkerThreadCount = 0 then
       Exit;
-    for i := low(fWorkerThreads) to high(fWorkerThreads) do
+    for Worker in fWorkerThreads do
     begin
-      Worker := fWorkerThreads[i];
+      LogProgress('Stopping ' + Worker.ThreadNameForDebugger);
+      Worker.Stop;
+      Inc(fCountStop);
+    end;
+    for Worker in fWorkerThreads do
+    begin
+      LogProgress('Freeing ' + Worker.ThreadNameForDebugger);
       Worker.Free;
       Inc(fCountFree);
     end;
@@ -212,14 +237,14 @@ var
   WorkerThread:TSimpleExample;
   Logger:ILogger;
 begin
-  if fTestCodeSite and Odd(Random(100)) then
-  begin
+//  if fTestCodeSite and Odd(Random(100)) then
+//  begin
     Logger := TiaCodeSiteLogger.Create('Viewer');
-  end
-  else
-  begin
-    Logger := TiaWindowsDebugLogging.Create;
-  end;
+//  end
+//  else
+//  begin
+//    Logger := TiaWindowsDebugLogging.Create;
+//  end;
   Logger.SetLoggingIsEnabled(True);
   Logger.SetCurrentLogLevel(TiaLogLevel.All);
 
@@ -291,5 +316,9 @@ begin
   labCanStartChecks.Caption := IntToStr(fCountCanStart);
 end;
 
+initialization
+  fActionLock := TCriticalSection.Create;
+finalization
+  fActionLock.Free;
 
 end.

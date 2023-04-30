@@ -48,6 +48,7 @@ object frmThreadStateTest: TfrmThreadStateTest
     Height = 144
     Align = alTop
     TabOrder = 1
+    ExplicitWidth = 631
     object Label1: TLabel
       Left = 24
       Top = 16
@@ -154,9 +155,8 @@ object frmThreadStateTest: TfrmThreadStateTest
     Height = 322
     Align = alClient
     TabOrder = 2
-    ExplicitTop = 206
     ExplicitWidth = 631
-    ExplicitHeight = 300
+    ExplicitHeight = 321
     object memLog: TMemo
       Left = 1
       Top = 1
@@ -166,7 +166,7 @@ object frmThreadStateTest: TfrmThreadStateTest
       ScrollBars = ssBoth
       TabOrder = 0
       ExplicitWidth = 629
-      ExplicitHeight = 298
+      ExplicitHeight = 319
     end
   end
   object tmrThreadEvent: TTimer

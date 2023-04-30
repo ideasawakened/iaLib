@@ -49,7 +49,7 @@ begin
     begin
       SleepTime := Random(1000);
       ReportProgress(Format('%s - random extra sleep %d', [ThreadNameForDebugger, SleepTime])); // simulate occasional wait on Input/Output
-      Self.Sleep(SleepTime); // use an abortable sleep  (if parent wants to cancel thread, sleep will be interrupted)
+      if ShouldWorkTerminate(SleepTime) then Exit; // use an abortable sleep  (if parent wants to cancel thread, sleep will be interrupted)
     end;
 
   end;
