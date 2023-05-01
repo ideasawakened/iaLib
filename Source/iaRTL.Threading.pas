@@ -757,7 +757,11 @@ end;
 
 function TiaThread.Sleep(const SleepTimeMS:Integer):Boolean;
 begin
-  if not Terminated then
+  if Terminated then
+  begin
+    Result := False;
+  end
+  else
   begin
     Result := (fAbortableSleepEvent.WaitFor(SleepTimeMS) = TWaitResult.wrTimeout);
   end;
