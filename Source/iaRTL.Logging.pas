@@ -22,6 +22,8 @@
 unit iaRTL.Logging;
 
 interface
+uses
+  System.SyncObjs;
 
 type
 
@@ -46,6 +48,8 @@ type
   private
     fLogLevel:TiaLogLevel;
     fIsEnabled:Boolean;
+    fThreadLock:TCriticalSection;
+    fUseThreadLock:Boolean;
   protected
     function GetCurrentLogLevel:TiaLogLevel; virtual;
     procedure SetCurrentLogLevel(const NewLevel:TiaLogLevel); virtual;
@@ -55,7 +59,8 @@ type
 
     procedure DoLog(const LogEntry:string; const LogLevel:TiaLogLevel); virtual;
   public
-    constructor Create;
+    constructor Create(const UseThreadLock:Boolean=False);
+    destructor Destroy; override;
 
     procedure Log(const LogEntry:string; const LogLevel:TiaLogLevel = TiaLogLevel.Debug); virtual;
 
@@ -71,12 +76,26 @@ const
 implementation
 
 
-constructor TiaBaseLogger.Create;
+constructor TiaBaseLogger.Create(const UseThreadLock:Boolean=False);
 begin
-  inherited;
+  inherited Create;
   fLogLevel := defLogLevel;
+  fUseThreadLock := UseThreadLock;
+  if UseThreadLock then
+  begin
+    fThreadLock := TCriticalSection.Create;
+  end;
 end;
 
+
+destructor TiaBaseLogger.Destroy;
+begin
+  if fUseThreadLock then
+  begin
+    fThreadLock.Free;
+  end;
+  inherited;
+end;
 
 function TiaBaseLogger.GetCurrentLogLevel:TiaLogLevel;
 begin
@@ -103,12 +122,29 @@ end;
 
 
 procedure TiaBaseLogger.Log(const LogEntry:string; const LogLevel:TiaLogLevel = TiaLogLevel.Debug);
+    procedure DoIt;
+    begin
+      if IsEnabled and (Ord(LogLevel) >= Ord(self.LogLevel)) then
+      begin
+        DoLog(LogEntry, LogLevel);
+      end;
+    end;
 begin
-  if IsEnabled and (Ord(LogLevel) >= Ord(self.LogLevel)) then
+  if fUseThreadLock then
   begin
-    DoLog(LogEntry, LogLevel);
+    fThreadLock.Enter;
+    try
+      DoIt;
+    finally
+      fThreadLock.Leave;
+    end;
+  end
+  else
+  begin
+    DoIt;
   end;
 end;
+
 
 
 procedure TiaBaseLogger.DoLog(const LogEntry:string; const LogLevel:TiaLogLevel);

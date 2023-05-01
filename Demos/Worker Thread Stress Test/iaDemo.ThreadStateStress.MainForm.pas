@@ -16,7 +16,11 @@ uses
   Vcl.StdCtrls,
   iaDemo.ExampleThread;
 
-type
+
+Type
+  TLogOutputChoices = (Undefined, NoLog, LogToDebugger, LogToCodeSite, LogToMemo);
+  TLogDestination = set of TLogOutputChoices;
+
   TfrmThreadStateTest = class(TForm)
     tmrThreadEvent:TTimer;
     panTop:TPanel;
@@ -54,8 +58,9 @@ type
     fCountStart:Int64;
     fCountIsActive:Int64;
     fCountCanStart:Int64;
-    fTestCodeSite:Boolean;
     fClosed:Boolean;
+    fLogDestinationChoices:TLogDestination;
+    fLogOverride:TLogOutputChoices;
     procedure LogProgress(const LogEntry:string);
     procedure DoCreateThread;
     procedure DoFree;
@@ -79,7 +84,8 @@ uses
   CodeSiteLogging,
   iaRTL.Logging,
   iaRTL.Logging.Debugger.Windows,
-  iaRTL.Logging.CodeSite;
+  iaRTL.Logging.CodeSite,
+  iaVCL.Logging.Memo;
 
 {$R *.dfm}
 
@@ -87,7 +93,12 @@ uses
 procedure TfrmThreadStateTest.FormCreate(Sender:TObject);
 begin
   ReportMemoryLeaksOnShutdown := True;
-  fTestCodeSite := CodeSite.Installed;
+  fLogDestinationChoices := [TLogOutputChoices.NoLog, TLogOutputChoices.LogToDebugger, TLogOutputChoices.LogToCodeSite];
+  if not CodeSite.Installed then
+  begin
+    fLogDestinationChoices := fLogDestinationChoices - [TLogOutputChoices.LogToCodeSite];
+  end;
+  fLogOverride := TLogOutputChoices.NoLog;  //override fLogDestinationChoices if set to anything other than Undefined
 end;
 
 
@@ -234,17 +245,39 @@ procedure TfrmThreadStateTest.DoCreateThread;
 var
   WorkerThread:TSimpleExample;
   Logger:ILogger;
+  LogTo:TLogOutputChoices;
+  SanityCheck:Integer;
 begin
-  if fTestCodeSite and Odd(Random(100)) then
+  Logger := nil;
+
+  LogTo := fLogOverride;
+  if (LogTo = TLogOutputChoices.Undefined) and (fLogDestinationChoices <> []) then  //randomly select a log output
   begin
-    Logger := TiaCodeSiteLogger.Create('Viewer');
-  end
-  else
-  begin
-    Logger := TiaWindowsDebugLogging.Create;
+    SanityCheck := 0;
+    repeat
+      LogTo := TLogOutputChoices(Random(Ord(TLogOutputChoices.LogToMemo)+1));
+      Inc(SanityCheck);
+      if SanityCheck > 20 then
+      begin
+        LogTo := TLogOutputChoices.NoLog;
+        Break;
+      end;
+    until LogTo in fLogDestinationChoices;
   end;
-  Logger.SetLoggingIsEnabled(True);
-  Logger.SetCurrentLogLevel(TiaLogLevel.All);
+
+  case LogTo of
+    TLogOutputChoices.LogToDebugger:
+      Logger := TiaWindowsDebugLogging.Create;
+    TLogOutputChoices.LogToCodeSite:
+      Logger := TiaCodeSiteLogger.Create('Viewer');
+    TLogOutputChoices.LogToMemo:
+      Logger := TiaMemoLogger.Create(memLog);
+  end;
+  if Assigned(Logger) then
+  begin
+    Logger.SetLoggingIsEnabled(True);
+    Logger.SetCurrentLogLevel(TiaLogLevel.Debug);
+  end;
 
   WorkerThread := TSimpleExample.Create('Worker' + fCountCreate.ToString, Logger);
   WorkerThread.PauseBetweenWorkMS := Random(1000);
