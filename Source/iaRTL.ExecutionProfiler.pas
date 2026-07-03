@@ -251,8 +251,8 @@ var
   vThreadWatch:TiaThreadWatch;
 begin
   vCurrentThreadId := TThread.CurrentThread.ThreadID;
-  Assert(not fThreadWatches.TryGetValue(vCurrentThreadId, vThreadWatch));
-
+  Assert(not fThreadWatches.TryGetValue(vCurrentThreadId, vThreadWatch),
+    Format('Duplicate StartTimer call for ''%s''', [Stats.TimerName]));
   vThreadWatch := TiaThreadWatch.Create;
   fThreadWatches.Add(vCurrentThreadId, vThreadWatch);
   vThreadWatch.fStopWatch := TStopWatch.StartNew;
