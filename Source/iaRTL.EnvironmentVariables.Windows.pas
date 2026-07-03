@@ -29,9 +29,11 @@ uses
   System.Classes;
 
 /// <summary>
-/// Note: the caller is responsible to call FreeMem on result
-/// </summar>
-function CreateEnvironmentBlock(const aEnvironmentList:TStrings):PChar;
+/// Returns the environment block as a string. The caller should hold the
+/// returned string in a variable whose lifetime spans the CreateProcess call
+/// and pass PChar(Result) as the lpEnvironment parameter.
+/// </summary>
+function CreateEnvironmentBlock(const aEnvironmentList:TStrings):string;
 
 function GetEnvironmentVariables(const aDestinationList:TStrings):Boolean;
 
@@ -42,9 +44,9 @@ uses
   WinAPI.Windows;
 
 
-function CreateEnvironmentBlock(const aEnvironmentList:TStrings):PChar;
+function CreateEnvironmentBlock(const aEnvironmentList:TStrings):string;
 begin
-  Result := PChar(StringReplace(aEnvironmentList.Text, #13#10, #0, [rfReplaceAll])); //+#0 on the end
+  Result := StringReplace(aEnvironmentList.Text, #13#10, #0, [rfReplaceAll]); //+#0 on the end
 end;
 
 function GetEnvironmentVariables(const aDestinationList:TStrings):Boolean;

@@ -84,7 +84,7 @@ type
     fCaptureEncoding:TEncoding;
   protected
     procedure CaptureSystemError(const aExtendedDescription:string);
-    function CreateEnvironmentVariables(var aCustomList:TStringList):PChar;
+    function CreateEnvironmentVariables(var aCustomList:TStringList; var aEnvironmentBlockStorage:string):PChar;
     function DoCreateProcess(const aWorkingFolder:string; const aEnvironmentVarPtr:PChar):Boolean;
     function GetExitCode:Boolean;
     function TryReadFromPipes:TReadPipeResult;
@@ -192,10 +192,10 @@ function ExecAndWait(const aCommandLine:string; const aWorkingFolder:string = ''
 /// By default, the captured text is assumed to be ANSI. If your launched applications outputs Unicode to StdOut then pass in TEncoding.Unicode;
 /// By default, your CommandLine will be prefixed with 'CMD /C ' which is required for commands like "dir *.txt" (The COMSPEC environment variable used to determine CMD)
 /// </summary>
-function ExecAndCaptureOutuput(const aCommandLine:string; const aOnStandardOutput:TOnCaptureProc; const aOnStandardError:TOnCaptureProc; const aCaptureEncoding:TEncoding = nil; const aAddCommandPrefix:Boolean = True; const aWorkingFolder:string = ''):Boolean;
+function ExecAndCaptureOutput(const aCommandLine:string; const aOnStandardOutput:TOnCaptureProc; const aOnStandardError:TOnCaptureProc; const aCaptureEncoding:TEncoding = nil; const aAddCommandPrefix:Boolean = True; const aWorkingFolder:string = ''):Boolean;
 
 /// <summary>
-/// Executes the given command line and does not wait for it to finish runing before returning
+/// Executes the given command line and does not wait for it to finish running before returning
 /// </summary>
 function StartProcess(const aCommandLine:string; const aWorkingFolder:string = ''):Boolean;
 
@@ -233,7 +233,7 @@ begin
 end;
 
 
-function ExecAndCaptureOutuput(const aCommandLine:string; const aOnStandardOutput:TOnCaptureProc; const aOnStandardError:TOnCaptureProc; const aCaptureEncoding:TEncoding=nil; const aAddCommandPrefix:Boolean=True; const aWorkingFolder:string = ''):Boolean;
+function ExecAndCaptureOutput(const aCommandLine:string; const aOnStandardOutput:TOnCaptureProc; const aOnStandardError:TOnCaptureProc; const aCaptureEncoding:TEncoding=nil; const aAddCommandPrefix:Boolean=True; const aWorkingFolder:string = ''):Boolean;
 var
   ProcessExecutor:TiaWindowsProcessExecutor;
   CmdLine:String;
@@ -290,9 +290,13 @@ end;
 function TiaWindowsProcessExecutor.LaunchProcess(const aCommandLine:string; const aWaitForCompletionFlag:Boolean = defWaitForCompletion; const aWorkingFolder:string = ''):Boolean;
 var
   EnvironmentListForChildProcess:TStringList;
+  EnvironmentBlockStorage:string;
   EnvironmentVars:PChar;
+  OriginalCreationFlags:DWord;
 begin
   Result := False;
+  OriginalCreationFlags := fProcessCreationFlags;
+  EnvironmentListForChildProcess := nil;
 
   fContext := Default(TiaLaunchContext);
   fContext.StartupInfo.cb := SizeOf(fContext.StartupInfo);
@@ -303,69 +307,69 @@ begin
     fContext.StartupInfo.wShowWindow := ShowWindowState; // SW_HIDE, SW_SHOWNORMAL...
   end;
 
-  EnvironmentVars := CreateEnvironmentVariables(EnvironmentListForChildProcess);
+  EnvironmentVars := CreateEnvironmentVariables(EnvironmentListForChildProcess, EnvironmentBlockStorage);
   try
 
     if Assigned(OnStandardOutputCapture) or Assigned(OnStandardErrorCapture) then
     begin
-      if not SetupRedirectedIO(GetCurrentProcess) then Exit(False);
       fContext.OutputCaptured := True;
+      if not SetupRedirectedIO(GetCurrentProcess) then Exit;
     end;
 
     if DoCreateProcess(aWorkingFolder, EnvironmentVars) then
     begin
-      try
 
-        if fContext.OutputCaptured then
-        begin
-          // These are no longer used in this parent process
-          // "You need to make sure that no handles to the write end of the
-          // output pipe are maintained in this process or else the pipe will
-          // not close when the child process exits and the ReadFile will hang."
-          TiaWinUtils.CloseHandle(fContext.IPC.StdOutput.ChildWrite);
-          TiaWinUtils.CloseHandle(fContext.IPC.StdError.ChildWrite);
-        end;
-
-        if aWaitForCompletionFlag or fContext.OutputCaptured then
-        begin
-          WaitForProcessStabilization;
-
-          if WaitForProcessCompletion and GetExitCode then
-          begin
-            if fContext.ExitCode = 0 then
-            begin
-              Result := True;
-            end
-            else
-            begin
-              fContext.ErrorCode := fContext.ExitCode;
-              fContext.ErrorMessage := 'Child process completed with ExitCode ' + fContext.ExitCode.ToString;
-            end;
-          end;
-        end
-        else
-        begin
-          Result := True;
-        end;
-
-      finally
-        fContext.Finalize;
+      if fContext.OutputCaptured then
+      begin
+        // These are no longer used in this parent process
+        // "You need to make sure that no handles to the write end of the
+        // output pipe are maintained in this process or else the pipe will
+        // not close when the child process exits and the ReadFile will hang."
+        TiaWinUtils.CloseHandle(fContext.IPC.StdOutput.ChildWrite);
+        TiaWinUtils.CloseHandle(fContext.IPC.StdError.ChildWrite);
       end;
+
+      if aWaitForCompletionFlag or fContext.OutputCaptured then
+      begin
+        WaitForProcessStabilization;
+
+        if WaitForProcessCompletion and GetExitCode then
+        begin
+          if fContext.ExitCode = 0 then
+          begin
+            Result := True;
+          end
+          else
+          begin
+            fContext.ErrorCode := fContext.ExitCode;
+            fContext.ErrorMessage := 'Child process completed with ExitCode ' + fContext.ExitCode.ToString;
+          end;
+        end;
+      end
+      else
+      begin
+        Result := True;
+      end;
+
     end;
+
   finally
+    fContext.Finalize;
     EnvironmentListForChildProcess.Free;
+    fProcessCreationFlags := OriginalCreationFlags;
   end;
 end;
 
 
 // Note: When adding custom environment variables, the parent's variables are not inherited by CreateProcess which may, or may not, be desired. Use InheritParentEnvironmentVariables to decide.
-function TiaWindowsProcessExecutor.CreateEnvironmentVariables(var aCustomList:TStringList):PChar;
+function TiaWindowsProcessExecutor.CreateEnvironmentVariables(var aCustomList:TStringList; var aEnvironmentBlockStorage:string):PChar;
 begin
   aCustomList := nil;
+  aEnvironmentBlockStorage := '';
 
   if EnvironmentVariables.Count > 0 then
   begin
-    ProcessCreationFlags := ProcessCreationFlags or CREATE_UNICODE_ENVIRONMENT; // by default, environment assumes ANSI, since we're using Unicode strings (assuming D2009+), need to tell Windows to expect Unicdoe characters
+    ProcessCreationFlags := ProcessCreationFlags or CREATE_UNICODE_ENVIRONMENT; // by default, environment assumes ANSI, since we're using Unicode strings (assuming D2009+), need to tell Windows to expect Unicode characters
 
     if InheritParentEnvironmentVariables then
     begin
@@ -375,11 +379,13 @@ begin
 
       aCustomList.Assign(EnvironmentVariables); // our custom list takes priority
       GetEnvironmentVariables(aCustomList); // then add any other unique variables from parent (duplicates ignored)
-      Result := CreateEnvironmentBlock(aCustomList);
+      aEnvironmentBlockStorage := CreateEnvironmentBlock(aCustomList);
+      Result := PChar(aEnvironmentBlockStorage);
     end
     else
     begin
-      Result := CreateEnvironmentBlock(EnvironmentVariables); // will only use our custom list, no parent variables inherited
+      aEnvironmentBlockStorage := CreateEnvironmentBlock(EnvironmentVariables); // will only use our custom list, no parent variables inherited
+      Result := PChar(aEnvironmentBlockStorage);
     end;
   end
   else
@@ -393,7 +399,8 @@ begin
       // A special case - we aren't specifying a list of custom environment variables, but we don't want the parent's environment either
       ProcessCreationFlags := ProcessCreationFlags or CREATE_UNICODE_ENVIRONMENT;
       aCustomList := TStringList.Create; // empty list
-      Result := CreateEnvironmentBlock(aCustomList);
+      aEnvironmentBlockStorage := CreateEnvironmentBlock(aCustomList);
+      Result := PChar(aEnvironmentBlockStorage);
     end;
   end;
 end;
