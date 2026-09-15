@@ -87,6 +87,9 @@ begin
   TimersAreEnabled := True;
   ThreadLock := TCriticalSection.Create;
 
+  //without this line TStopwatch.IsHighResolution is uninitialized and delivers a random value.
+  TStopwatch.Create;    //init record and call InitStopwatchType
+
   if TStopwatch.IsHighResolution then
   begin
     TickFrequency := 10000000.0 / TStopwatch.Frequency;
